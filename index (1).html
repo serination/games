@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Games Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+  .bar h1 { color: var(--ink); }
+
+  h2.section {
+    margin: 34px 0 14px; font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--mute);
+    font-variation-settings: 'wdth' 88, 'wght' 700;
+  }
+  h2.section:first-of-type { margin-top: 26px; }
+
+  .games { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  @media (min-width: 560px) { .games { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 880px) { .games { grid-template-columns: 1fr 1fr 1fr; } }
+
+  .game {
+    --fill: var(--c-cyan);
+    display: flex; flex-direction: column; gap: 5px;
+    min-height: 124px;
+    padding: 16px 17px; border-radius: 9px;
+    background: var(--fill); color: var(--on-colour);
+    text-decoration: none;
+    transition: transform .16s cubic-bezier(.3,.7,.4,1), filter .16s;
+  }
+  a.game:hover { transform: translateY(-3px); filter: brightness(1.08); }
+  a.game:active { transform: translateY(-1px); }
+
+  .game .name {
+    font-size: 20px; font-variation-settings: 'wdth' 112, 'wght' 800;
+    letter-spacing: -.015em; line-height: 1.1;
+  }
+  .game .blurb {
+    font-size: 13.5px; line-height: 1.4; opacity: .78;
+    font-variation-settings: 'wdth' 92, 'wght' 500;
+  }
+  .game .tag {
+    margin-top: auto; font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; font-variation-settings: 'wdth' 85, 'wght' 800;
+    opacity: .66;
+  }
+
+  /* not built yet: the colour drops back to an outline */
+  .game.pending {
+    background: transparent;
+    color: var(--fill);
+    border: 1px solid color-mix(in srgb, var(--fill) 40%, transparent);
+  }
+  .game.pending .blurb { color: var(--mute); opacity: 1; }
+  .game.pending .tag { opacity: .8; }
+
+  .links { display: grid; gap: 8px; grid-template-columns: 1fr; }
+  @media (min-width: 560px) { .links { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 880px) { .links { grid-template-columns: 1fr 1fr 1fr; } }
+
+  .links a {
+    --fill: var(--c-lime);
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 12px 14px; border-radius: 7px;
+    background: var(--surface); color: var(--ink);
+    text-decoration: none;
+    border-left: 5px solid var(--fill);
+    transition: background .15s, transform .15s;
+    font-size: 15.5px; font-variation-settings: 'wdth' 100, 'wght' 700;
+  }
+  .links a:hover { background: var(--surface-2); transform: translateX(2px); }
+  .links a span {
+    margin-left: auto; text-align: right;
+    font-size: 12.5px; color: var(--mute);
+    font-variation-settings: 'wdth' 90, 'wght' 500;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <h1>The Games Room</h1>
+  </div>
+
+  <h2 class="section">Games here</h2>
+  <div class="games">
+
+    <a class="game" href="guess-who.html" style="--fill: var(--c-purple)">
+      <span class="name">Guess Who</span>
+      <span class="blurb">Celebrities, the Arsenal squad, or names you type in yourself.</span>
+      <span class="tag">Ready</span>
+    </a>
+
+    <a class="game" href="connect-four.html" style="--fill: var(--c-red)">
+      <span class="name">Connect Four</span>
+      <span class="blurb">Four in a row, across, down or diagonally.</span>
+      <span class="tag">Ready</span>
+    </a>
+
+    <div class="game pending" style="--fill: var(--c-green)">
+      <span class="name">Golf</span>
+      <span class="blurb">Six-card golf. Lowest score wins.</span>
+      <span class="tag">Next up</span>
+    </div>
+
+    <div class="game pending" style="--fill: var(--c-blue)">
+      <span class="name">Word Duel</span>
+      <span class="blurb">Same hidden word, race to solve it.</span>
+      <span class="tag">Building</span>
+    </div>
+
+    <div class="game pending" style="--fill: var(--c-cyan)">
+      <span class="name">Battleship</span>
+      <span class="blurb">Hidden fleets and called shots.</span>
+      <span class="tag">Building</span>
+    </div>
+
+    <div class="game pending" style="--fill: var(--c-coral)">
+      <span class="name">Gonga</span>
+      <span class="blurb">Two decks, melds, out at 101.</span>
+      <span class="tag">Building</span>
+    </div>
+
+  </div>
+
+  <h2 class="section">Elsewhere</h2>
+  <div class="links">
+    <a href="https://www.nytimes.com/games/wordle/index.html" target="_blank" rel="noopener" style="--fill: var(--c-lime)">Wordle <span>Five letters, six tries</span></a>
+    <a href="https://www.nytimes.com/games/connections" target="_blank" rel="noopener" style="--fill: var(--c-pink)">Connections <span>Sixteen words, four groups</span></a>
+    <a href="https://travle.earth/" target="_blank" rel="noopener" style="--fill: var(--c-green)">Travle <span>Country to country by land</span></a>
+    <a href="https://worldle.teuteuf.fr/" target="_blank" rel="noopener" style="--fill: var(--c-blue)">Worldle <span>Name the country from its shape</span></a>
+    <a href="https://globle-game.com/" target="_blank" rel="noopener" style="--fill: var(--c-cyan)">Globle <span>Hotter and colder on a globe</span></a>
+    <a href="https://skribbl.io/" target="_blank" rel="noopener" style="--fill: var(--c-coral)">skribbl.io <span>Drawing and guessing</span></a>
+  </div>
+
+  <details class="help">
+    <summary>Adding to this page</summary>
+    <p>The Elsewhere list is plain HTML near the bottom of <code>index.html</code>. Copy one of the
+       lines, change the address, the name and the description, and commit. The colour comes from
+       the <code>--fill</code> value at the end of the line; the eight available are named at the
+       top of <code>base.css</code>.</p>
+    <p>A game marked Building has no page behind it yet.</p>
+  </details>
+
+</div>
+</body>
+</html>

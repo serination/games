@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guess Who</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+  :root { --accent: var(--c-purple); --tile: #EFE9DE; --tile-ink: #211D26; }
+
+  /* ---- lobby source picker ---- */
+  .sources { display: grid; gap: 8px; grid-template-columns: 1fr; }
+  @media (min-width: 460px) { .sources { grid-template-columns: repeat(3, 1fr); } }
+  .source {
+    text-align: left; padding: 12px 14px; border-radius: 7px;
+    background: var(--surface); border: 1px solid var(--rule); color: var(--ink);
+  }
+  .source:hover { background: var(--surface-2); }
+  .source[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
+  .source .t { display: block; font-size: 15px; font-variation-settings: 'wdth' 100, 'wght' 700; }
+  .source .d { display: block; font-size: 12.5px; color: var(--mute); margin-top: 3px; font-variation-settings: 'wdth' 90, 'wght' 400; }
+  .source[aria-pressed="true"] .d { color: var(--ink); opacity: .75; }
+
+  /* ---- secret strip ---- */
+  .secret {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 13px 16px; border-radius: 7px; margin: 20px 0 4px;
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    border-left: 4px solid var(--accent);
+  }
+  .secret .label { font-size: 12px; color: var(--mute); letter-spacing: .07em; font-variation-settings: 'wdth' 88, 'wght' 700; }
+  .secret .val {
+    font-size: clamp(18px, 4vw, 24px); line-height: 1.15;
+    font-variation-settings: 'wdth' 108, 'wght' 700; letter-spacing: -.01em;
+  }
+  .secret .val.masked { color: var(--accent); letter-spacing: .14em; }
+  .secret .btn { margin-left: auto; }
+
+  /* ---- board ---- */
+  .board {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 9px; padding: clamp(8px, 1.6vw, 14px);
+    box-shadow: 0 14px 34px var(--shadow);
+  }
+  .grid { display: grid; gap: clamp(6px, 1.3vw, 10px); grid-template-columns: repeat(3, 1fr); }
+  @media (min-width: 520px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (min-width: 860px) { .grid { grid-template-columns: repeat(6, 1fr); } }
+
+  .cell {
+    position: relative; aspect-ratio: 4/5;
+    background: #14121A; border-radius: 4px;
+    box-shadow: inset 0 2px 7px rgba(0,0,0,.6);
+    perspective: 800px;
+  }
+  .tile {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    padding: 6px 5px; margin: 0; border: none;
+    background: var(--tile); color: var(--tile-ink);
+    border-radius: 4px 4px 2px 2px;
+    transform-origin: bottom center;
+    transition: transform .34s cubic-bezier(.18,.82,.3,1), filter .34s;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 4px 10px rgba(0,0,0,.45);
+    text-align: center;
+  }
+  .tile span {
+    font-size: clamp(10.5px, 1.3vw + 5.5px, 14.5px);
+    font-variation-settings: 'wdth' 76, 'wght' 600;
+    line-height: 1.16; overflow-wrap: break-word; hyphens: auto;
+  }
+  .tile:hover { filter: brightness(1.05); }
+  .cell.down .tile {
+    transform: rotateX(-74deg); filter: brightness(.42) saturate(.5);
+    box-shadow: 0 1px 3px rgba(0,0,0,.5);
+  }
+  .board.guessing .cell:not(.down) .tile { box-shadow: inset 0 0 0 3px var(--accent), 0 4px 10px rgba(0,0,0,.45); }
+  .board.guessing .cell.down .tile { opacity: .35; }
+  .board.locked .tile { cursor: default; }
+
+  /* ---- action area ---- */
+  .actions { margin: 16px 0 0; display: grid; gap: 10px; }
+  .ask-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ask-row input { flex: 1 1 260px; font-size: 15px; }
+  .yesno { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .asked {
+    padding: 12px 15px; border-radius: 7px; background: var(--surface-2);
+    font-size: 16px; font-variation-settings: 'wdth' 100, 'wght' 600;
+  }
+  .confirm {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 12px 15px; border-radius: 7px;
+    background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  }
+  .confirm .q { font-size: 15px; font-variation-settings: 'wght' 600; }
+
+  /* ---- log ---- */
+  .log { margin-top: 26px; display: grid; gap: 0; }
+  .log h3 {
+    margin: 0 0 8px; font-size: 12px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--mute); font-variation-settings: 'wdth' 88, 'wght' 700;
+  }
+  .log-row {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 9px 2px; border-bottom: 1px solid var(--rule);
+    font-size: 14.5px;
+  }
+  .log-row .who {
+    flex: none; width: 4.2em; font-size: 12px; color: var(--mute);
+    font-variation-settings: 'wdth' 85, 'wght' 700; letter-spacing: .05em; text-transform: uppercase;
+  }
+  .log-row .q { flex: 1; min-width: 0; }
+  .log-row .a {
+    flex: none; font-variation-settings: 'wght' 800; letter-spacing: .04em;
+    font-size: 13px; text-transform: uppercase;
+  }
+  .log-row .a.yes { color: var(--c-green); }
+  .log-row .a.no { color: var(--c-red); }
+  .log-empty { font-size: 14px; color: var(--mute); padding: 6px 2px; }
+
+  .result {
+    margin: 18px 0 0; padding: 16px 18px; border-radius: 8px;
+    background: var(--accent); color: var(--on-colour);
+  }
+  .result .big { font-size: 22px; font-variation-settings: 'wdth' 112, 'wght' 800; letter-spacing: -.01em; }
+  .result .sub { font-size: 14.5px; margin-top: 4px; opacity: .85; }
+  .result .btn { margin-top: 12px; background: var(--on-colour); color: var(--accent); border-color: var(--on-colour); }
+  .result .btn:hover { filter: brightness(1.3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <h1>Guess Who</h1>
+    <span class="chip" id="roomChip" hidden>Room <b id="roomCode"></b></span>
+    <span class="chip" id="deckChip" hidden></span>
+  </div>
+  <a class="home" href="index.html">&larr; All games</a>
+
+  <!-- ================= LOBBY ================= -->
+  <section class="lobby" id="lobby">
+    <div>
+      <h2>Pick a board</h2>
+      <p>Whoever starts the room chooses. The other player gets the same board sent over.</p>
+    </div>
+
+    <div class="sources">
+      <button class="source" type="button" id="srcCeleb" aria-pressed="true">
+        <span class="t">Celebrities</span>
+        <span class="d">24 drawn at random from a big pool</span>
+      </button>
+      <button class="source" type="button" id="srcArsenal" aria-pressed="false">
+        <span class="t">Arsenal</span>
+        <span class="d">The 2026/27 first-team squad</span>
+      </button>
+      <button class="source" type="button" id="srcCustom" aria-pressed="false">
+        <span class="t">Your own</span>
+        <span class="d">Type in whoever you like</span>
+      </button>
+    </div>
+
+    <div id="customWrap" hidden>
+      <label class="note" for="customNames">One name per line. Anywhere from 12 to 30 — 24 plays best.</label>
+      <textarea id="customNames" rows="7" spellcheck="false"
+        placeholder="Mum&#10;Dad&#10;Auntie Maria&#10;&#8230;"></textarea>
+      <p class="note" id="customCount">0 names</p>
+    </div>
+
+    <div class="lobby-row">
+      <button class="btn primary" id="hostBtn" type="button">Start a room</button>
+      <span class="note">or join theirs</span>
+      <input class="code" id="codeInput" maxlength="4" placeholder="CODE" aria-label="Room code" autocomplete="off" spellcheck="false">
+      <button class="btn" id="joinBtn" type="button">Join</button>
+    </div>
+
+    <div class="code-plate" id="codePlate" hidden>
+      <div>
+        <div class="label">YOUR ROOM CODE</div>
+        <div class="code" id="codeText">&nbsp;</div>
+      </div>
+      <span class="note">Send this over, then wait here.</span>
+    </div>
+
+    <p class="note bad" id="lobbyError" hidden></p>
+  </section>
+
+  <!-- ================= GAME ================= -->
+  <section id="game" hidden>
+
+    <div class="secret">
+      <div>
+        <div class="label">THEY ARE TRYING TO GUESS</div>
+        <div class="val masked" id="secretVal">hidden</div>
+      </div>
+      <button class="btn" id="peekBtn" type="button">Show me</button>
+    </div>
+
+    <div class="turn">
+      <span class="dot" id="turnDot" style="background: var(--accent)"></span>
+      <span id="turnText">Your turn</span>
+      <span class="sub" id="turnSub"></span>
+    </div>
+
+    <div class="board" id="board"><div class="grid" id="grid"></div></div>
+
+    <div class="actions" id="actions">
+      <!-- my turn: ask or guess -->
+      <div id="askBox" hidden>
+        <div class="ask-row">
+          <input id="askInput" maxlength="140" placeholder="Ask a yes or no question&#8230;" autocomplete="off">
+          <button class="btn primary" id="askBtn" type="button">Ask</button>
+          <button class="btn" id="guessBtn" type="button">Guess instead</button>
+        </div>
+      </div>
+
+      <!-- guess mode -->
+      <div class="confirm" id="guessBar" hidden>
+        <span class="q" id="guessPrompt">Tap the person you think they are.</span>
+        <button class="btn" id="guessCancel" type="button">Cancel</button>
+      </div>
+      <div class="confirm" id="guessConfirm" hidden>
+        <span class="q" id="guessName"></span>
+        <button class="btn primary" id="guessYes" type="button">Lock it in</button>
+        <button class="btn" id="guessNo" type="button">Back</button>
+      </div>
+
+      <!-- their turn: answer -->
+      <div id="answerBox" hidden>
+        <div class="asked" id="askedText"></div>
+        <div class="yesno" style="margin-top:10px">
+          <button class="btn primary" id="yesBtn" type="button">Yes</button>
+          <button class="btn" id="noBtn" type="button">No</button>
+          <span class="note">Answer honestly about your own person.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <div class="big" id="resultBig"></div>
+      <div class="sub" id="resultSub"></div>
+      <button class="btn" id="againBtn" type="button">Play again</button>
+    </div>
+
+    <div class="log" id="logWrap">
+      <h3>Questions asked</h3>
+      <div id="logList"><p class="log-empty">Nothing yet.</p></div>
+    </div>
+
+    <p class="note bad" id="dropNote" hidden>The connection dropped. Reload and start a new room.</p>
+  </section>
+
+  <details class="help">
+    <summary>How to play</summary>
+    <ul>
+      <li>You each get a person from the board. They guess yours, you guess theirs.</li>
+      <li>On your turn, ask one yes-or-no question. They answer, and the turn passes.</li>
+      <li>Knock tiles down as you rule people out. Your board is private to you.</li>
+      <li>Instead of asking, you can guess. Get it right and you win &mdash; get it wrong and you lose,
+          so save it for when you're sure.</li>
+    </ul>
+  </details>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="net.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ============ ROSTERS — edit these lists freely ============ */
+
+  // Drawn from at random. w:true is only used to keep the draw evenly split.
+  var CELEBS = [
+    { n: "Adele", w: 1 }, { n: "Taylor Swift", w: 1 }, { n: "Raye", w: 1 }, { n: "Dua Lipa", w: 1 },
+    { n: "Beyoncé", w: 1 }, { n: "Rihanna", w: 1 }, { n: "Billie Eilish", w: 1 }, { n: "SZA", w: 1 },
+    { n: "Charli XCX", w: 1 }, { n: "Little Simz", w: 1 }, { n: "Laufey", w: 1 },
+    { n: "Ed Sheeran", w: 0 }, { n: "Kanye West", w: 0 }, { n: "Frank Ocean", w: 0 },
+    { n: "Stormzy", w: 0 }, { n: "Harry Styles", w: 0 }, { n: "Drake", w: 0 },
+    { n: "Central Cee", w: 0 }, { n: "Bad Bunny", w: 0 }, { n: "Sam Fender", w: 0 },
+
+    { n: "Zendaya", w: 1 }, { n: "Scarlett Johansson", w: 1 }, { n: "Margot Robbie", w: 1 },
+    { n: "Florence Pugh", w: 1 }, { n: "Michaela Coel", w: 1 }, { n: "Olivia Colman", w: 1 },
+    { n: "Ayo Edebiri", w: 1 }, { n: "Jodie Comer", w: 1 },
+    { n: "Tom Holland", w: 0 }, { n: "Matthew McConaughey", w: 0 }, { n: "The Rock", w: 0 },
+    { n: "Idris Elba", w: 0 }, { n: "Timothée Chalamet", w: 0 }, { n: "Daniel Kaluuya", w: 0 },
+    { n: "Pedro Pascal", w: 0 }, { n: "Cillian Murphy", w: 0 },
+
+    { n: "Serena Williams", w: 1 }, { n: "Emma Raducanu", w: 1 }, { n: "Simone Biles", w: 1 },
+    { n: "Keely Hodgkinson", w: 1 }, { n: "Katarina Johnson-Thompson", w: 1 },
+    { n: "Bukayo Saka", w: 0 }, { n: "Declan Rice", w: 0 }, { n: "Mikel Arteta", w: 0 },
+    { n: "Lionel Messi", w: 0 }, { n: "Cristiano Ronaldo", w: 0 }, { n: "Lewis Hamilton", w: 0 },
+    { n: "Paddy Pimblett", w: 0 }, { n: "Erling Haaland", w: 0 }, { n: "Lando Norris", w: 0 },
+    { n: "Marcus Rashford", w: 0 }, { n: "Jude Bellingham", w: 0 },
+
+    { n: "Nella Rose", w: 1 }, { n: "Zoella", w: 1 }, { n: "Amelia Dimoldenberg", w: 1 },
+    { n: "Sophie Duker", w: 1 },
+    { n: "Niko Omilana", w: 0 }, { n: "Chunkz", w: 0 }, { n: "Deji", w: 0 },
+    { n: "Max Fosh", w: 0 }, { n: "KSI", w: 0 }, { n: "MrBeast", w: 0 },
+    { n: "Munya Chawawa", w: 0 }, { n: "Yung Filly", w: 0 },
+
+    { n: "Michelle Obama", w: 1 }, { n: "Greta Thunberg", w: 1 }, { n: "Malala Yousafzai", w: 1 },
+    { n: "Rishi Sunak", w: 0 }, { n: "Keir Starmer", w: 0 }, { n: "Barack Obama", w: 0 },
+    { n: "David Attenborough", w: 0 }, { n: "Sadiq Khan", w: 0 }
+  ];
+
+  var ARSENAL = [
+    "David Raya", "William Saliba", "Cristhian Mosquera", "Ben White",
+    "Piero Hincapié", "Gabriel Magalhães", "Bukayo Saka", "Martin Ødegaard",
+    "Eberechi Eze", "Jurriën Timber", "Kepa", "Viktor Gyökeres",
+    "Ezri Konsa", "Christos Tzolis", "Noni Madueke", "Ethan Nwaneri",
+    "Mikel Merino", "Kai Havertz", "Illan Meslier", "Riccardo Calafiori",
+    "Martín Zubimendi", "Bruno Guimarães", "Declan Rice", "Myles Lewis-Skelly"
+  ];
+
+  /* ============ helpers ============ */
+
+  function shuffle(a) {
+    var out = a.slice();
+    for (var i = out.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = out[i]; out[i] = out[j]; out[j] = t;
+    }
+    return out;
+  }
+
+  function drawCelebs() {
+    var women = shuffle(CELEBS.filter(function (c) { return c.w; })).slice(0, 12);
+    var men = shuffle(CELEBS.filter(function (c) { return !c.w; })).slice(0, 12);
+    return shuffle(women.concat(men)).map(function (c) { return c.n; });
+  }
+
+  function cleanCustom(text) {
+    var seen = {};
+    return String(text || "").split("\n")
+      .map(function (s) { return s.trim().replace(/\s+/g, " "); })
+      .filter(function (s) {
+        if (!s || s.length > 32) return false;
+        var k = s.toLowerCase();
+        if (seen[k]) return false;
+        seen[k] = 1; return true;
+      })
+      .slice(0, 30);
+  }
+
+  /* ============ state ============ */
+
+  var net = null, iAmHost = false;
+  var roster = [], secret = -1, down = {}, log = [];
+  var myTurn = false, phase = "lobby";   // lobby | ask | waitAnswer | answer | over
+  var guessMode = false, pendingGuess = -1;
+  var gameNo = 1, source = "celeb", shown = false;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var gridEl = $("grid"), boardEl = $("board");
+
+  /* ============ lobby: source picker ============ */
+
+  var srcButtons = { celeb: $("srcCeleb"), arsenal: $("srcArsenal"), custom: $("srcCustom") };
+  Object.keys(srcButtons).forEach(function (key) {
+    srcButtons[key].addEventListener("click", function () {
+      source = key;
+      Object.keys(srcButtons).forEach(function (k) {
+        srcButtons[k].setAttribute("aria-pressed", k === key ? "true" : "false");
+      });
+      $("customWrap").hidden = key !== "custom";
+      syncHostBtn();
+    });
+  });
+
+  function syncHostBtn() {
+    if (source !== "custom") {
+      $("hostBtn").disabled = false;
+      $("hostBtn").title = "";
+      return;
+    }
+    var n = cleanCustom($("customNames").value).length;
+    $("hostBtn").disabled = n < 12;
+    $("hostBtn").title = n < 12 ? "Add at least 12 names first" : "";
+  }
+
+  $("customNames").addEventListener("input", function () {
+    var n = cleanCustom(this.value).length;
+    $("customCount").textContent = n + (n === 1 ? " name" : " names") +
+      (n && n < 12 ? " — need at least 12" : "");
+    syncHostBtn();
+  });
+
+  function buildRoster() {
+    if (source === "arsenal") return ARSENAL.slice();
+    if (source === "custom") return cleanCustom($("customNames").value);
+    return drawCelebs();
+  }
+
+  function sourceLabel() {
+    return source === "arsenal" ? "Arsenal squad" : source === "custom" ? "Your list" : "Celebrities";
+  }
+
+  /* ============ board ============ */
+
+  function renderBoard() {
+    gridEl.textContent = "";
+    roster.forEach(function (name, i) {
+      var cell = document.createElement("div");
+      cell.className = "cell" + (down[i] ? " down" : "");
+      var tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "tile";
+      tile.setAttribute("aria-pressed", down[i] ? "true" : "false");
+      var s = document.createElement("span");
+      s.textContent = name;
+      tile.appendChild(s);
+      tile.addEventListener("click", function () {
+        if (guessMode) { pendingGuess = i; showGuessConfirm(); return; }
+        if (phase === "over") return;
+        down[i] = !down[i];
+        cell.classList.toggle("down", !!down[i]);
+        tile.setAttribute("aria-pressed", down[i] ? "true" : "false");
+      });
+      cell.appendChild(tile);
+      gridEl.appendChild(cell);
+    });
+  }
+
+  /* ============ chrome ============ */
+
+  function paintSecret() {
+    var el = $("secretVal");
+    if (shown) {
+      el.textContent = roster[secret];
+      el.classList.remove("masked");
+      $("peekBtn").textContent = "Hide";
+    } else {
+      el.textContent = "hidden";
+      el.classList.add("masked");
+      $("peekBtn").textContent = "Show me";
+    }
+  }
+  $("peekBtn").addEventListener("click", function () { shown = !shown; paintSecret(); });
+
+  function renderLog() {
+    var list = $("logList");
+    list.textContent = "";
+    if (!log.length) {
+      var p = document.createElement("p");
+      p.className = "log-empty";
+      p.textContent = "Nothing yet.";
+      list.appendChild(p);
+      return;
+    }
+    log.slice().reverse().forEach(function (entry) {
+      var row = document.createElement("div");
+      row.className = "log-row";
+      var who = document.createElement("span");
+      who.className = "who";
+      who.textContent = entry.mine ? "You" : "Them";
+      var q = document.createElement("span");
+      q.className = "q";
+      q.textContent = entry.text;
+      var a = document.createElement("span");
+      a.className = "a " + (entry.answer === "yes" ? "yes" : entry.answer === "no" ? "no" : "");
+      a.textContent = entry.answer ? entry.answer : "…";
+      row.appendChild(who); row.appendChild(q); row.appendChild(a);
+      list.appendChild(row);
+    });
+  }
+
+  function setPhase(p) {
+    phase = p;
+    $("askBox").hidden = p !== "ask";
+    $("answerBox").hidden = p !== "answer";
+    $("guessBar").hidden = !(p === "ask" && guessMode && pendingGuess < 0);
+    $("guessConfirm").hidden = !(p === "ask" && guessMode && pendingGuess >= 0);
+    boardEl.classList.toggle("guessing", guessMode && p === "ask");
+    boardEl.classList.toggle("locked", p === "over");
+
+    var t = $("turnText"), s = $("turnSub");
+    if (p === "ask") { t.textContent = "Your turn"; s.textContent = guessMode ? "pick who you think they are" : "ask a question, or guess"; }
+    else if (p === "waitAnswer") { t.textContent = "Waiting for their answer"; s.textContent = ""; }
+    else if (p === "answer") { t.textContent = "They asked you something"; s.textContent = ""; }
+    else if (p === "over") { t.textContent = "Game over"; s.textContent = ""; }
+    $("turnDot").hidden = p === "over";
+  }
+
+  function showGuessConfirm() {
+    $("guessName").textContent = "Guess " + roster[pendingGuess] + "? A wrong guess loses the game.";
+    setPhase("ask");
+  }
+
+  /* ============ actions ============ */
+
+  $("askBtn").addEventListener("click", function () {
+    var text = $("askInput").value.trim();
+    if (!text || phase !== "ask" || !net) return;
+    $("askInput").value = "";
+    log.push({ mine: true, text: text, answer: null });
+    renderLog();
+    net.send({ type: "ask", text: text, game: gameNo });
+    setPhase("waitAnswer");
+  });
+  $("askInput").addEventListener("keydown", function (e) { if (e.key === "Enter") $("askBtn").click(); });
+
+  $("guessBtn").addEventListener("click", function () { guessMode = true; pendingGuess = -1; setPhase("ask"); });
+  $("guessCancel").addEventListener("click", function () { guessMode = false; pendingGuess = -1; setPhase("ask"); });
+  $("guessNo").addEventListener("click", function () { pendingGuess = -1; setPhase("ask"); });
+
+  $("guessYes").addEventListener("click", function () {
+    if (pendingGuess < 0 || !net) return;
+    var idx = pendingGuess;
+    guessMode = false; pendingGuess = -1;
+    net.send({ type: "guess", index: idx, game: gameNo });
+    setPhase("waitAnswer");
+    $("turnText").textContent = "Guess sent";
+    $("turnSub").textContent = "waiting…";
+  });
+
+  function answer(value) {
+    if (phase !== "answer" || !net) return;
+    var last = log[log.length - 1];
+    if (last && !last.mine && last.answer === null) { last.answer = value; renderLog(); }
+    net.send({ type: "answer", value: value, game: gameNo });
+    setPhase("ask");
+  }
+  $("yesBtn").addEventListener("click", function () { answer("yes"); });
+  $("noBtn").addEventListener("click", function () { answer("no"); });
+
+  function endGame(big, sub) {
+    setPhase("over");
+    $("resultBig").textContent = big;
+    $("resultSub").textContent = sub;
+    $("result").hidden = false;
+    shown = true; paintSecret();
+  }
+
+  $("againBtn").addEventListener("click", function () {
+    if (!net) return;
+    if (iAmHost) startRound(gameNo + 1, buildRoster());
+    else net.send({ type: "again", game: gameNo });
+    $("againBtn").disabled = true;
+    $("againBtn").textContent = "Starting…";
+  });
+
+  /* ============ round lifecycle ============ */
+
+  function startRound(n, list) {
+    gameNo = n;
+    roster = list;
+    secret = Math.floor(Math.random() * roster.length);
+    down = {};
+    log = [];
+    shown = false;
+    guessMode = false; pendingGuess = -1;
+    $("result").hidden = true;
+    $("againBtn").disabled = false;
+    $("againBtn").textContent = "Play again";
+    renderBoard();
+    renderLog();
+    paintSecret();
+    setPhase(iAmHost ? "ask" : "waitAnswer");
+    if (!iAmHost) { $("turnText").textContent = "Their turn"; $("turnSub").textContent = "they ask first"; }
+    if (iAmHost) net.send({ type: "round", game: gameNo, roster: roster, label: sourceLabel() });
+  }
+
+  /* ============ wiring ============ */
+
+  var lobbyCtl = GameNet.lobby({
+    panel: $("lobby"),
+    hostBtn: $("hostBtn"),
+    joinBtn: $("joinBtn"),
+    codeInput: $("codeInput"),
+    codePlate: $("codePlate"),
+    codeText: $("codeText"),
+    error: $("lobbyError")
+  }, function (connection, role) {
+    net = connection;
+    iAmHost = role === "host";
+    var code = iAmHost ? $("codeText").textContent.trim() : $("codeInput").value.trim().toUpperCase();
+    if (code) { $("roomCode").textContent = code; $("roomChip").hidden = false; }
+    $("game").hidden = false;
+    if (iAmHost) {
+      $("deckChip").textContent = sourceLabel();
+      $("deckChip").hidden = false;
+      startRound(1, buildRoster());
+    } else {
+      setPhase("waitAnswer");
+      $("turnText").textContent = "Setting up";
+      $("turnSub").textContent = "waiting for their board…";
+    }
+  });
+
+  // Host-side guard: don't let them open a room with an unusable custom list.
+  syncHostBtn();
+
+  lobbyCtl.setHandlers({
+    onData: function (msg) {
+      if (!msg || typeof msg.type !== "string") return;
+
+      if (msg.type === "round") {
+        if (iAmHost || !Array.isArray(msg.roster) || !msg.roster.length) return;
+        gameNo = msg.game;
+        roster = msg.roster.slice(0, 30).map(String);
+        $("deckChip").textContent = String(msg.label || "Their board").slice(0, 24);
+        $("deckChip").hidden = false;
+        secret = Math.floor(Math.random() * roster.length);
+        down = {}; log = []; shown = false;
+        guessMode = false; pendingGuess = -1;
+        $("result").hidden = true;
+        $("againBtn").disabled = false;
+        $("againBtn").textContent = "Play again";
+        renderBoard(); renderLog(); paintSecret();
+        setPhase("waitAnswer");
+        $("turnText").textContent = "Their turn";
+        $("turnSub").textContent = "they ask first";
+        return;
+      }
+
+      if (msg.game !== gameNo) return;
+
+      if (msg.type === "ask") {
+        if (phase === "over") return;
+        log.push({ mine: false, text: String(msg.text || "").slice(0, 140), answer: null });
+        renderLog();
+        $("askedText").textContent = log[log.length - 1].text;
+        setPhase("answer");
+
+      } else if (msg.type === "answer") {
+        var mine = null;
+        for (var i = log.length - 1; i >= 0; i--) { if (log[i].mine && log[i].answer === null) { mine = log[i]; break; } }
+        if (mine) { mine.answer = msg.value === "yes" ? "yes" : "no"; renderLog(); }
+        setPhase("waitAnswer");
+        $("turnText").textContent = "Their turn";
+        $("turnSub").textContent = "waiting…";
+
+      } else if (msg.type === "guess") {
+        var correct = msg.index === secret;
+        net.send({ type: "guessResult", index: msg.index, correct: correct, game: gameNo });
+        if (correct) endGame("They got you", "They guessed " + roster[secret] + ", and they were right.");
+        else endGame("You win", "They guessed " + roster[msg.index] + ". You were " + roster[secret] + ".");
+
+      } else if (msg.type === "guessResult") {
+        if (msg.correct) endGame("You win", "They were " + roster[msg.index] + ".");
+        else endGame("You lose", "They weren't " + roster[msg.index] + ". A wrong guess ends it.");
+
+      } else if (msg.type === "again") {
+        if (iAmHost) startRound(gameNo + 1, buildRoster());
+      }
+    },
+
+    onDrop: function () {
+      $("dropNote").hidden = false;
+      setPhase("over");
+      $("result").hidden = true;
+      $("turnText").textContent = "Disconnected";
+      $("turnSub").textContent = "";
+    }
+  });
+})();
+</script>
+</body>
+</html>
