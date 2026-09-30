@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Word Duel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+  :root {
+    --accent: var(--c-blue);
+    --hit: var(--c-green);
+    --near: var(--c-lime);
+    --miss: #3A3744;
+    --tile-empty: #221F2B;
+  }
+
+  .modes { display: grid; gap: 8px; grid-template-columns: 1fr; }
+  @media (min-width: 480px) { .modes { grid-template-columns: 1fr 1fr; } }
+  .mode {
+    text-align: left; padding: 13px 15px; border-radius: 7px;
+    background: var(--surface); border: 1px solid var(--rule); color: var(--ink);
+  }
+  .mode:hover { background: var(--surface-2); }
+  .mode[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
+  .mode .t { display: block; font-size: 15px; font-variation-settings: 'wdth' 100, 'wght' 700; }
+  .mode .d { display: block; font-size: 12.5px; color: var(--mute); margin-top: 3px; font-variation-settings: 'wdth' 90, 'wght' 400; }
+  .mode[aria-pressed="true"] .d { color: var(--ink); opacity: .75; }
+
+  .arena { display: grid; gap: 26px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 760px) { .arena { grid-template-columns: minmax(0,1fr) 190px; } }
+
+  .grid6 { display: grid; gap: 6px; max-width: 340px; margin: 0 auto; }
+  .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .tile {
+    aspect-ratio: 1; border-radius: 5px; display: grid; place-items: center;
+    background: var(--tile-empty); box-shadow: inset 0 0 0 1px var(--rule);
+    font-size: clamp(20px, 6vw, 28px); line-height: 1;
+    font-variation-settings: 'wdth' 100, 'wght' 800; text-transform: uppercase;
+    color: var(--ink);
+  }
+  .tile.filled { box-shadow: inset 0 0 0 2px var(--mute); }
+  .tile.hit  { background: var(--hit);  color: var(--on-colour); box-shadow: none; }
+  .tile.near { background: var(--near); color: var(--on-colour); box-shadow: none; }
+  .tile.miss { background: var(--miss); color: var(--mute); box-shadow: none; }
+  .row.bad { animation: shake .34s; }
+  @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+  .oppo { display: grid; gap: 8px; }
+  .oppo h3 {
+    margin: 0; font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--mute); font-variation-settings: 'wdth' 86, 'wght' 700;
+  }
+  .mini { display: grid; gap: 4px; max-width: 150px; }
+  .mini .row { gap: 4px; }
+  .mini .tile { aspect-ratio: 1; border-radius: 3px; font-size: 0; }
+  .oppo .status { font-size: 13.5px; color: var(--mute); line-height: 1.5; }
+
+  .keyboard { display: grid; gap: 6px; margin: 20px auto 0; max-width: 480px; }
+  .krow { display: flex; gap: 5px; justify-content: center; }
+  .key {
+    flex: 1 1 auto; min-width: 0; padding: 13px 4px; border-radius: 5px;
+    background: var(--surface-2); color: var(--ink); border: none;
+    font-size: 13px; font-variation-settings: 'wdth' 90, 'wght' 700;
+    text-transform: uppercase;
+  }
+  .key.wide { flex: 1.6 1 auto; font-size: 11.5px; letter-spacing: .05em; }
+  .key:hover:not(:disabled) { filter: brightness(1.2); }
+  .key.hit  { background: var(--hit);  color: var(--on-colour); }
+  .key.near { background: var(--near); color: var(--on-colour); }
+  .key.miss { background: #2A2733; color: #6B6674; }
+
+  .setword { display: grid; gap: 12px; max-width: 420px; margin-top: 22px; }
+  .setword input { font-size: 20px; letter-spacing: .3em; text-transform: uppercase; text-align: center; width: 7em; }
+
+  .result {
+    margin: 20px 0 0; padding: 16px 18px; border-radius: 8px;
+    background: var(--accent); color: var(--on-colour);
+  }
+  .result .big { font-size: 23px; font-variation-settings: 'wdth' 112, 'wght' 800; letter-spacing: -.01em; }
+  .result .sub { font-size: 14.5px; margin-top: 5px; opacity: .9; }
+  .result .btn { margin-top: 12px; background: var(--on-colour); color: var(--accent); border-color: var(--on-colour); }
+  .result .btn:hover { filter: brightness(1.3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <h1>Word Duel</h1>
+    <span class="chip" id="roomChip" hidden>Room <b id="roomCode"></b></span>
+  </div>
+  <a class="home" href="index.html">&larr; All games</a>
+
+  <section class="lobby" id="lobby">
+    <div>
+      <h2>Five letters, six goes</h2>
+      <p>Fewest guesses wins. You both play at your own pace &mdash; it isn't a race to type.</p>
+    </div>
+
+    <div class="modes">
+      <button class="mode" type="button" id="modeSame" aria-pressed="true">
+        <span class="t">Same word</span>
+        <span class="d">You both hunt one word the page picks</span>
+      </button>
+      <button class="mode" type="button" id="modeDuel" aria-pressed="false">
+        <span class="t">Set each other's</span>
+        <span class="d">You each choose a word for the other</span>
+      </button>
+    </div>
+
+    <div class="lobby-row">
+      <button class="btn primary" id="hostBtn" type="button">Start a room</button>
+      <span class="note">or join theirs</span>
+      <input class="code" id="codeInput" maxlength="4" placeholder="CODE" aria-label="Room code" autocomplete="off" spellcheck="false">
+      <button class="btn" id="joinBtn" type="button">Join</button>
+    </div>
+
+    <div class="code-plate" id="codePlate" hidden>
+      <div>
+        <div class="label">YOUR ROOM CODE</div>
+        <div class="code" id="codeText">&nbsp;</div>
+      </div>
+      <span class="note">Send this over, then wait here.</span>
+    </div>
+    <p class="note bad" id="lobbyError" hidden></p>
+  </section>
+
+  <section class="setword" id="setword" hidden>
+    <h2 style="margin:0;font-size:17px">Choose their word</h2>
+    <p class="note">Five letters. They'll have six goes at it.</p>
+    <div class="lobby-row">
+      <input id="wordInput" maxlength="5" autocomplete="off" spellcheck="false" aria-label="Word for your opponent">
+      <button class="btn primary" id="wordBtn" type="button">Lock it in</button>
+    </div>
+    <p class="note bad" id="wordError" hidden></p>
+    <p class="note" id="wordWait" hidden>Locked in. Waiting for theirs&hellip;</p>
+  </section>
+
+  <section id="game" hidden>
+    <div class="turn">
+      <span class="dot" id="turnDot" style="background: var(--accent)"></span>
+      <span id="turnText">Your guess</span>
+      <span class="sub" id="turnSub"></span>
+    </div>
+
+    <div class="arena">
+      <div>
+        <div class="grid6" id="myGrid"></div>
+        <div class="keyboard" id="keyboard"></div>
+      </div>
+      <div class="oppo">
+        <h3>Them</h3>
+        <div class="mini" id="theirGrid"></div>
+        <div class="status" id="theirStatus">Not started.</div>
+      </div>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <div class="big" id="resultBig"></div>
+      <div class="sub" id="resultSub"></div>
+      <button class="btn" id="againBtn" type="button">Play again</button>
+    </div>
+
+    <p class="note bad" id="dropNote" hidden>The connection dropped. Reload and start a new room.</p>
+  </section>
+
+  <details class="help">
+    <summary>How it works</summary>
+    <ul>
+      <li>Green means right letter, right place. Yellow means right letter, wrong place.</li>
+      <li>You both get six guesses and play at your own speed. Whoever solves it in fewer guesses
+          wins; same number is a draw.</li>
+      <li>You can see how many guesses they've had and the colours they got, but not their letters.</li>
+      <li><b>Same word</b> puts the secret in the browser of whoever started the room. It's never
+          shown to them, but it isn't cheat-proof. <b>Set each other's</b> has no such hole, since
+          the word you're hunting only ever exists on the other person's machine.</li>
+    </ul>
+  </details>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="net.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var ROWS = 6, LEN = 5;
+
+  /* ---- answers the "same word" mode draws from ---- */
+  var ANSWERS = ("about above abuse actor acute admit adopt adult after again agent agree ahead alarm album " +
+  "alert alike alive allow alone along alter among anger angle angry apart apple apply arena argue arise " +
+  "armed array arrow aside asset avoid awake award aware badly baker bases basic basis beach began begin " +
+  "begun being below bench birth black blame blank blast blind block blood board boost booth bound brain " +
+  "brand brass brave bread break breed brief bring broad broke brown brush build built buyer cable carry " +
+  "catch cause chain chair chaos charm chart chase cheap check chest chief child china chose civil claim " +
+  "class clean clear click climb clock close cloth cloud coach coast could count court cover crack craft " +
+  "crash crazy cream crime cross crowd crown crude curve cycle daily dance dated dealt death debut delay " +
+  "depth doing doubt dozen draft drama drawn dream dress drill drink drive drove dying eager early earth " +
+  "eight elite empty enemy enjoy enter entry equal error event every exact exist extra faith false fault " +
+  "field fifth fifty fight final first fixed flash fleet floor fluid focus force forth forty forum found " +
+  "frame frank fraud fresh front fruit fully funny giant given glass globe going grace grade grand grant " +
+  "grass grave great green gross group grown guard guess guest guide happy heart heavy hence hobby honey " +
+  "horse hotel house human ideal image imply index inner input issue joint judge known label large laser " +
+  "later laugh layer learn lease least leave legal level light limit lives local logic loose lower lucky " +
+  "lunch lying magic major maker march match maybe mayor meant media metal might minor minus mixed model " +
+  "money month moral motor mount mouse mouth movie music never newly night noise north noted novel nurse " +
+  "occur ocean offer often order other ought paint panel paper party peace phase phone photo piece pilot " +
+  "pitch place plain plane plant plate point pound power press price pride prime print prior prize proof " +
+  "proud prove queen quick quiet quite radio raise range rapid ratio reach ready realm rebel refer relax " +
+  "repay reply right rigid rival river rough round route royal rural scale scene scope score sense serve " +
+  "seven shall shape share sharp sheet shelf shell shift shine shirt shock shoot short shown sight silly " +
+  "since sixth sixty sized skill sleep slide small smart smile smoke snake solid solve sorry sound south " +
+  "space spare speak speed spend spent split spoke sport staff stage stake stand start state steam steel " +
+  "steep steer stick still stock stone stood store storm story strip stuck study stuff style sugar suite " +
+  "super sweet table taken taste teach teeth thank theft their theme there these thick thing think third " +
+  "those three threw throw thumb tight timer tired title today token topic total touch tough tower track " +
+  "trade train treat trend trial tribe trick tried truck truly trunk trust truth twice twist ultra uncle " +
+  "under undue union unity until upper upset urban usage usual valid value video virus visit vital vocal " +
+  "voice waste watch water wheel where which while white whole whose woman women world worry worse worst " +
+  "worth would wound write wrong wrote yield young youth").split(" ");
+
+  /* ---- optional full dictionary for validating guesses ---- */
+  var DICT = null;
+  var DICT_URL = "https://cdn.jsdelivr.net/npm/wordle-wordlist@1.0.1-c/cache/guesses.js";
+  var DICT_KEY = "wordduel.dict.v1";
+
+  function adoptDict(words) {
+    if (!words || words.length < 5000) return false;
+    DICT = Object.create(null);
+    for (var i = 0; i < words.length; i++) DICT[words[i]] = 1;
+    for (var j = 0; j < ANSWERS.length; j++) DICT[ANSWERS[j]] = 1;
+    return true;
+  }
+
+  (function loadDict() {
+    try {
+      var cached = localStorage.getItem(DICT_KEY);
+      if (cached && adoptDict(cached.split(" "))) return;
+    } catch (e) {}
+    if (typeof fetch !== "function") return;
+    fetch(DICT_URL).then(function (r) { return r.ok ? r.text() : null; }).then(function (txt) {
+      if (!txt) return;
+      var found = txt.match(/["']([a-z]{5})["']/g) || [];
+      var words = found.map(function (s) { return s.slice(1, -1); });
+      if (adoptDict(words)) {
+        try { localStorage.setItem(DICT_KEY, words.join(" ")); } catch (e) {}
+      }
+    }).catch(function () {});
+  })();
+
+  function isWord(w) { return DICT ? !!DICT[w] : true; }
+
+  /* ---- scoring ---- */
+  function mark(guess, answer) {
+    var res = ["miss", "miss", "miss", "miss", "miss"];
+    var left = {};
+    var i;
+    for (i = 0; i < LEN; i++) {
+      if (guess[i] === answer[i]) res[i] = "hit";
+      else left[answer[i]] = (left[answer[i]] || 0) + 1;
+    }
+    for (i = 0; i < LEN; i++) {
+      if (res[i] === "hit") continue;
+      var g = guess[i];
+      if (left[g] > 0) { res[i] = "near"; left[g]--; }
+    }
+    return res;
+  }
+
+  /* ---- state ---- */
+  var net = null, iAmHost = false, mode = "same";
+  var answerForMe = null;      // only set when I'm allowed to know it (I never am while playing)
+  var wordIScore = null;       // the word I check the opponent's guesses against
+  var myRows = [], theirRows = [];
+  var myDone = false, theirDone = false;
+  var mySolved = false, theirSolved = false;
+  var current = "", keyState = {};
+  var myWordSet = false, theirWordSet = false;
+  var revealed = null;
+  var lastSubmitted = null;
+
+  /* ---- rendering ---- */
+
+  function buildGrid(container, rows, small) {
+    container.textContent = "";
+    for (var r = 0; r < ROWS; r++) {
+      var row = document.createElement("div");
+      row.className = "row";
+      row.dataset.row = r;
+      for (var c = 0; c < LEN; c++) {
+        var t = document.createElement("div");
+        t.className = "tile";
+        var data = rows[r];
+        if (data) {
+          t.classList.add(data.marks[c]);
+          if (!small) t.textContent = data.word[c];
+        } else if (!small && r === myRows.length) {
+          if (current[c]) { t.textContent = current[c]; t.classList.add("filled"); }
+        }
+        row.appendChild(t);
+      }
+      container.appendChild(row);
+    }
+  }
+
+  function renderKeys() {
+    var rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+    var kb = $("keyboard");
+    kb.textContent = "";
+    rows.forEach(function (letters, ri) {
+      var row = document.createElement("div");
+      row.className = "krow";
+      if (ri === 2) row.appendChild(makeKey("enter", "Enter", true));
+      letters.split("").forEach(function (ch) { row.appendChild(makeKey(ch, ch, false)); });
+      if (ri === 2) row.appendChild(makeKey("back", "Del", true));
+      kb.appendChild(row);
+    });
+  }
+
+  function makeKey(id, label, wide) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "key" + (wide ? " wide" : "") + (keyState[id] ? " " + keyState[id] : "");
+    b.textContent = label;
+    b.disabled = myDone;
+    b.addEventListener("click", function () { press(id); });
+    return b;
+  }
+
+  function render() {
+    buildGrid($("myGrid"), myRows, false);
+    buildGrid($("theirGrid"), theirRows, true);
+    renderKeys();
+
+    var st = $("theirStatus");
+    if (theirDone) st.textContent = theirSolved ? "Solved in " + theirRows.length + "." : "Out of guesses.";
+    else st.textContent = theirRows.length + " of 6 used.";
+
+    var t = $("turnText"), sub = $("turnSub");
+    if (myDone && theirDone) { t.textContent = "Both finished"; sub.textContent = ""; }
+    else if (myDone) { t.textContent = mySolved ? "Solved in " + myRows.length : "Out of guesses"; sub.textContent = "waiting for them…"; }
+    else { t.textContent = "Guess " + (myRows.length + 1) + " of 6"; sub.textContent = DICT ? "" : "any five letters accepted"; }
+    $("turnDot").hidden = myDone && theirDone;
+  }
+
+  /* ---- input ---- */
+
+  function press(k) {
+    if (myDone) return;
+    if (k === "back") { current = current.slice(0, -1); render(); return; }
+    if (k === "enter") { submit(); return; }
+    if (/^[a-z]$/.test(k) && current.length < LEN) { current += k; render(); }
+  }
+
+  document.addEventListener("keydown", function (e) {
+    if ($("game").hidden) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "Enter") { press("enter"); e.preventDefault(); }
+    else if (e.key === "Backspace") { press("back"); e.preventDefault(); }
+    else if (/^[a-zA-Z]$/.test(e.key)) { press(e.key.toLowerCase()); e.preventDefault(); }
+  });
+
+  function reject(msg) {
+    var rows = $("myGrid").children;
+    var row = rows[myRows.length];
+    if (row) { row.classList.add("bad"); setTimeout(function () { row.classList.remove("bad"); }, 340); }
+    $("turnSub").textContent = msg;
+  }
+
+  function submit() {
+    if (myDone) return;
+    if (current.length !== LEN) { reject("Needs five letters."); return; }
+    if (!isWord(current)) { reject("Not in the word list."); return; }
+    var word = current;
+    if (canScoreMine()) {
+      recordMine(word, mark(word, myTargetWord()));
+    } else {
+      lastSubmitted = word;
+      current = "";
+      net.send({ type: "guess", word: word });
+      render();
+      $("turnSub").textContent = "checking…";
+    }
+  }
+
+  function canScoreMine() { return mode === "same" && iAmHost; }
+  function myTargetWord() { return answerForMe; }
+
+  function recordMine(word, marks) {
+    current = "";
+    myRows.push({ word: word, marks: marks });
+    for (var i = 0; i < LEN; i++) {
+      var ch = word[i], m = marks[i];
+      var rank = { miss: 1, near: 2, hit: 3 };
+      if (!keyState[ch] || rank[m] > rank[keyState[ch]]) keyState[ch] = m;
+    }
+    var solved = marks.every(function (m) { return m === "hit"; });
+    if (solved) { mySolved = true; myDone = true; }
+    else if (myRows.length >= ROWS) { myDone = true; }
+    net.send({ type: "row", marks: marks, done: myDone, solved: mySolved, n: myRows.length });
+    render();
+    maybeFinish();
+  }
+
+  function maybeFinish() {
+    if (!(myDone && theirDone)) return;
+    if (mode === "same" && iAmHost) net.send({ type: "reveal", word: answerForMe });
+    if (mode === "duel") net.send({ type: "reveal", word: wordIScore });
+    showResult();
+  }
+
+  function showResult() {
+    var mine = mySolved ? myRows.length : 99;
+    var theirs = theirSolved ? theirRows.length : 99;
+    var big, sub;
+    if (mine < theirs) big = "You win";
+    else if (mine > theirs) big = "They win";
+    else big = mySolved ? "Draw" : "Nobody got it";
+    if (mySolved && theirSolved) sub = "You took " + myRows.length + ", they took " + theirRows.length + ".";
+    else if (mySolved) sub = "You got it in " + myRows.length + ". They ran out.";
+    else if (theirSolved) sub = "They got it in " + theirRows.length + ". You ran out.";
+    else sub = "Six guesses each, no winner.";
+    if (revealed) sub += " The word was " + revealed.toUpperCase() + ".";
+    $("resultBig").textContent = big;
+    $("resultSub").textContent = sub;
+    $("result").hidden = false;
+    $("againBtn").disabled = false;
+    $("againBtn").textContent = "Play again";
+  }
+
+  /* ---- rounds ---- */
+
+  function beginSameWord(word) {
+    answerForMe = word;
+    wordIScore = word;
+    startPlay();
+  }
+
+  function startPlay() {
+    myRows = []; theirRows = [];
+    myDone = theirDone = mySolved = theirSolved = false;
+    current = ""; keyState = {}; revealed = null;
+    $("setword").hidden = true;
+    $("result").hidden = true;
+    $("game").hidden = false;
+    render();
+  }
+
+  function newRound() {
+    myWordSet = theirWordSet = false;
+    if (mode === "same") {
+      if (iAmHost) {
+        var w = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
+        net.send({ type: "start", mode: "same" });
+        beginSameWord(w);
+      }
+    } else {
+      $("game").hidden = true;
+      $("setword").hidden = false;
+      $("wordInput").value = "";
+      $("wordInput").disabled = false;
+      $("wordBtn").disabled = false;
+      $("wordWait").hidden = true;
+      $("wordError").hidden = true;
+      if (iAmHost) net.send({ type: "start", mode: "duel" });
+    }
+  }
+
+  $("wordBtn").addEventListener("click", function () {
+    var w = $("wordInput").value.trim().toLowerCase();
+    if (!/^[a-z]{5}$/.test(w)) { $("wordError").textContent = "Five letters, nothing else."; $("wordError").hidden = false; return; }
+    if (!isWord(w)) { $("wordError").textContent = "That isn't in the word list."; $("wordError").hidden = false; return; }
+    $("wordError").hidden = true;
+    wordIScore = w;
+    myWordSet = true;
+    $("wordInput").disabled = true;
+    $("wordBtn").disabled = true;
+    $("wordWait").hidden = false;
+    net.send({ type: "wordset" });
+    if (theirWordSet) startPlay();
+  });
+  $("wordInput").addEventListener("keydown", function (e) { if (e.key === "Enter") $("wordBtn").click(); });
+
+  $("againBtn").addEventListener("click", function () {
+    $("againBtn").disabled = true;
+    $("againBtn").textContent = "Setting up…";
+    if (iAmHost) newRound();
+    else net.send({ type: "again" });
+  });
+
+  /* ---- mode picker ---- */
+  var modeBtns = { same: $("modeSame"), duel: $("modeDuel") };
+  Object.keys(modeBtns).forEach(function (k) {
+    modeBtns[k].addEventListener("click", function () {
+      mode = k;
+      Object.keys(modeBtns).forEach(function (o) { modeBtns[o].setAttribute("aria-pressed", o === k ? "true" : "false"); });
+    });
+  });
+
+  /* ---- transport ---- */
+
+  var lobbyCtl = GameNet.lobby({
+    panel: $("lobby"),
+    hostBtn: $("hostBtn"),
+    joinBtn: $("joinBtn"),
+    codeInput: $("codeInput"),
+    codePlate: $("codePlate"),
+    codeText: $("codeText"),
+    error: $("lobbyError")
+  }, function (connection, role) {
+    net = connection;
+    iAmHost = role === "host";
+    var code = iAmHost ? $("codeText").textContent.trim() : $("codeInput").value.trim().toUpperCase();
+    if (code) { $("roomCode").textContent = code; $("roomChip").hidden = false; }
+    if (iAmHost) newRound();
+  });
+
+  lobbyCtl.setHandlers({
+    onData: function (msg) {
+      if (!msg || typeof msg.type !== "string") return;
+
+      if (msg.type === "start" && !iAmHost) {
+        mode = msg.mode === "duel" ? "duel" : "same";
+        if (mode === "same") { answerForMe = null; wordIScore = null; startPlay(); }
+        else { myWordSet = theirWordSet = false; newRound(); }
+        return;
+      }
+
+      if (msg.type === "wordset") {
+        theirWordSet = true;
+        if (myWordSet) startPlay();
+        return;
+      }
+
+      if (msg.type === "guess") {
+        // I hold the word this guess is measured against.
+        var target = mode === "same" ? answerForMe : wordIScore;
+        if (!target) return;
+        var w = String(msg.word || "").toLowerCase();
+        if (!/^[a-z]{5}$/.test(w)) return;
+        var marks = mark(w, target);
+        var solved = marks.every(function (m) { return m === "hit"; });
+        theirRows.push({ word: w, marks: marks });
+        if (solved) { theirSolved = true; theirDone = true; }
+        else if (theirRows.length >= ROWS) { theirDone = true; }
+        net.send({ type: "result", marks: marks, solved: solved, done: theirDone });
+        render();
+        maybeFinish();
+        return;
+      }
+
+      if (msg.type === "result") {
+        // My own guess, scored by whoever holds the word.
+        if (!Array.isArray(msg.marks) || msg.marks.length !== LEN) return;
+        recordScoredMine(msg.marks);
+        return;
+      }
+
+      if (msg.type === "row") {
+        if (!Array.isArray(msg.marks)) return;
+        theirRows.push({ word: "?????", marks: msg.marks });
+        theirSolved = !!msg.solved;
+        theirDone = !!msg.done;
+        render();
+        maybeFinish();
+        return;
+      }
+
+      if (msg.type === "reveal") {
+        revealed = String(msg.word || "");
+        if (myDone && theirDone) showResult();
+        return;
+      }
+
+      if (msg.type === "again" && iAmHost) { newRound(); }
+    },
+
+    onDrop: function () {
+      $("dropNote").hidden = false;
+      $("turnText").textContent = "Disconnected";
+      $("turnSub").textContent = "";
+    }
+  });
+
+  function recordScoredMine(marks) {
+    var word = lastSubmitted;
+    if (!word) return;
+    lastSubmitted = null;
+    myRows.push({ word: word, marks: marks });
+    for (var i = 0; i < LEN; i++) {
+      var ch = word[i], m = marks[i];
+      var rank = { miss: 1, near: 2, hit: 3 };
+      if (!keyState[ch] || rank[m] > rank[keyState[ch]]) keyState[ch] = m;
+    }
+    var solved = marks.every(function (m) { return m === "hit"; });
+    if (solved) { mySolved = true; myDone = true; }
+    else if (myRows.length >= ROWS) { myDone = true; }
+    render();
+    maybeFinish();
+  }
+
+  renderKeys();
+})();
+</script>
+</body>
+</html>

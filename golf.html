@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Golf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+  :root {
+    --accent: var(--c-green);
+    --felt: #1B3830;
+    --felt-edge: rgba(255,255,255,.1);
+    --card-face: #F3EFE6;
+    --card-ink: #1A1820;
+    --card-red: #C0392B;
+    --card-back: #2F4D8A;
+  }
+
+  .table {
+    background: var(--felt); border: 1px solid var(--felt-edge);
+    border-radius: 11px; padding: clamp(12px, 2.4vw, 20px);
+    box-shadow: 0 16px 38px var(--shadow);
+    display: grid; gap: clamp(14px, 3vw, 24px);
+  }
+
+  .side { display: grid; gap: 8px; }
+  .side-label {
+    font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase;
+    color: rgba(255,255,255,.55); font-variation-settings: 'wdth' 86, 'wght' 700;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .side-label .sc {
+    margin-left: auto; letter-spacing: .04em; color: #fff;
+    font-variation-settings: 'wght' 800; font-variant-numeric: tabular-nums;
+  }
+
+  .hand {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: clamp(5px, 1.2vw, 9px); max-width: 420px;
+  }
+  .hand.mine { max-width: 460px; }
+
+  .slot {
+    aspect-ratio: 5/7; border-radius: 5px; padding: 0; margin: 0;
+    border: none; position: relative;
+    background: rgba(0,0,0,.28);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07);
+    display: grid; place-items: center;
+    font: inherit; color: var(--card-ink);
+    transition: transform .14s, box-shadow .14s;
+  }
+  .slot.facedown {
+    background: var(--card-back);
+    background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.09) 0 5px, transparent 5px 10px);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.14);
+  }
+  .slot.faceup { background: var(--card-face); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .slot.gone { background: rgba(0,0,0,.18); box-shadow: none; }
+  .slot.pickable { cursor: pointer; box-shadow: 0 0 0 3px var(--accent); }
+  .slot.pickable:hover { transform: translateY(-3px); }
+  .slot.paired .rank, .slot.paired .suit { opacity: .4; }
+  .slot .zero {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 15px; font-variation-settings: 'wdth' 110, 'wght' 800; color: var(--accent);
+  }
+
+  .rank {
+    position: absolute; top: 5px; left: 6px; line-height: 1;
+    font-size: clamp(13px, 2.6vw, 17px);
+    font-variation-settings: 'wdth' 95, 'wght' 800;
+  }
+  .suit { font-size: clamp(17px, 3.6vw, 24px); line-height: 1; }
+  .red .rank, .red .suit { color: var(--card-red); }
+
+  .middle {
+    display: flex; gap: clamp(10px, 2.4vw, 18px); align-items: flex-end;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .pile { display: grid; gap: 6px; justify-items: center; }
+  .pile .cap {
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: rgba(255,255,255,.55); font-variation-settings: 'wdth' 86, 'wght' 700;
+  }
+  .pile .slot { width: clamp(52px, 13vw, 74px); }
+  .pile.drawn .slot { box-shadow: 0 0 0 3px var(--accent), 0 6px 14px rgba(0,0,0,.45); }
+  .empty-pile { color: rgba(255,255,255,.4); font-size: 12px; }
+
+  .prompt {
+    margin: 18px 0 0; padding: 13px 16px; border-radius: 7px;
+    background: var(--surface-2);
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    font-size: 15.5px; font-variation-settings: 'wght' 600;
+  }
+  .prompt .btn { margin-left: auto; }
+
+  .result {
+    margin: 18px 0 0; padding: 16px 18px; border-radius: 8px;
+    background: var(--accent); color: var(--on-colour);
+  }
+  .result .big { font-size: 23px; font-variation-settings: 'wdth' 112, 'wght' 800; letter-spacing: -.01em; }
+  .result .sub { font-size: 14.5px; margin-top: 5px; opacity: .85; }
+  .result .btn { margin-top: 12px; background: var(--on-colour); color: var(--accent); border-color: var(--on-colour); }
+  .result .btn:hover { filter: brightness(1.3); }
+
+  table.scoring { border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  table.scoring td { padding: 2px 12px 2px 0; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <h1>Golf</h1>
+    <span class="chip" id="roomChip" hidden>Room <b id="roomCode"></b></span>
+  </div>
+  <a class="home" href="index.html">&larr; All games</a>
+
+  <section class="lobby" id="lobby">
+    <div>
+      <h2>Eight-card golf</h2>
+      <p>Two rows of four. Lowest total wins the hand.</p>
+    </div>
+    <div class="lobby-row">
+      <button class="btn primary" id="hostBtn" type="button">Start a room</button>
+      <span class="note">or join theirs</span>
+      <input class="code" id="codeInput" maxlength="4" placeholder="CODE" aria-label="Room code" autocomplete="off" spellcheck="false">
+      <button class="btn" id="joinBtn" type="button">Join</button>
+    </div>
+    <div class="code-plate" id="codePlate" hidden>
+      <div>
+        <div class="label">YOUR ROOM CODE</div>
+        <div class="code" id="codeText">&nbsp;</div>
+      </div>
+      <span class="note">Send this over, then wait here.</span>
+    </div>
+    <p class="note bad" id="lobbyError" hidden></p>
+  </section>
+
+  <section id="game" hidden>
+    <div class="turn">
+      <span class="dot" id="turnDot" style="background: var(--accent)"></span>
+      <span id="turnText">Flip two cards</span>
+      <span class="sub" id="turnSub"></span>
+    </div>
+
+    <div class="table">
+      <div class="side">
+        <div class="side-label">Them <span class="sc" id="theirScore"></span></div>
+        <div class="hand" id="theirHand"></div>
+      </div>
+
+      <div class="middle">
+        <div class="pile">
+          <div class="cap">Stock</div>
+          <button class="slot facedown" id="stockPile" type="button"></button>
+          <div class="cap" id="stockCount"></div>
+        </div>
+        <div class="pile">
+          <div class="cap">Discard</div>
+          <button class="slot" id="discardPile" type="button"></button>
+        </div>
+        <div class="pile drawn" id="drawnWrap" hidden>
+          <div class="cap">In hand</div>
+          <div class="slot faceup" id="drawnCard"></div>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="side-label">You <span class="sc" id="myScore"></span></div>
+        <div class="hand mine" id="myHand"></div>
+      </div>
+    </div>
+
+    <div class="prompt" id="prompt" hidden>
+      <span id="promptText"></span>
+      <button class="btn" id="promptBtn" type="button" hidden></button>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <div class="big" id="resultBig"></div>
+      <div class="sub" id="resultSub"></div>
+      <table class="scoring" id="resultTable"></table>
+      <button class="btn" id="againBtn" type="button">Play again</button>
+    </div>
+
+    <p class="note bad" id="dropNote" hidden>The connection dropped. Reload and start a new room.</p>
+  </section>
+
+  <details class="help">
+    <summary>Rules</summary>
+    <ul>
+      <li>Eight cards each, face down in two rows of four. You both start by flipping any two.</li>
+      <li>On your turn, take the top of the stock or the top of the discard pile. A card taken from
+          the discard pile has to go into your grid. A card from the stock can either go in, or be
+          thrown away &mdash; and if you throw it away you flip one of your face-down cards instead.</li>
+      <li>Swapping a card in puts the old one face up on the discard pile.</li>
+      <li>Scores: king 0, ace 1, two counts &minus;2, everything else face value, jacks and queens 10.</li>
+      <li>Two cards of the same rank in the same column both count zero &mdash; including a pair of
+          twos, so pairing those throws away four points.</li>
+      <li>When someone has all eight face up the other player gets one last turn, then everything is
+          revealed. Lowest total wins.</li>
+      <li>The deck lives in the browser of whoever started the room. Neither of you is shown anything
+          you shouldn't see, but it isn't cheat-proof against someone really trying.</li>
+    </ul>
+  </details>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="net.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+  var SUITS = ["♠","♥","♦","♣"];
+  var VALUES = { "A":1, "2":-2, "3":3, "4":4, "5":5, "6":6, "7":7, "8":8, "9":9, "10":10, "J":10, "Q":10, "K":0 };
+  var SLOTS = 8;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ================= pure game logic ================= */
+
+  function freshDeck() {
+    var d = [];
+    for (var s = 0; s < SUITS.length; s++)
+      for (var r = 0; r < RANKS.length; r++) d.push({ r: RANKS[r], s: SUITS[s] });
+    for (var i = d.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = d[i]; d[i] = d[j]; d[j] = t;
+    }
+    return d;
+  }
+
+  // Columns are slots c and c+4. A matched column scores zero.
+  function scoreHand(cards) {
+    var total = 0;
+    for (var c = 0; c < 4; c++) {
+      var a = cards[c], b = cards[c + 4];
+      if (!a || !b) { total += (a ? VALUES[a.r] : 0) + (b ? VALUES[b.r] : 0); continue; }
+      if (a.r === b.r) continue;
+      total += VALUES[a.r] + VALUES[b.r];
+    }
+    return total;
+  }
+
+  function pairedColumns(cards) {
+    var out = {};
+    for (var c = 0; c < 4; c++) {
+      var a = cards[c], b = cards[c + 4];
+      if (a && b && a.r === b.r) { out[c] = 1; out[c + 4] = 1; }
+    }
+    return out;
+  }
+
+  function allUp(up) { return up.every(function (x) { return x; }); }
+  function countUp(up) { return up.filter(Boolean).length; }
+
+  /* ================= host-authoritative state ================= */
+
+  var S = null;
+
+  function newHand() {
+    var deck = freshDeck();
+    var g1 = deck.splice(0, SLOTS), g2 = deck.splice(0, SLOTS);
+    S = {
+      deck: deck,
+      discard: [deck.pop()],
+      grid: { 1: g1, 2: g2 },
+      up: { 1: [0,0,0,0,0,0,0,0], 2: [0,0,0,0,0,0,0,0] },
+      phase: "setup",
+      turn: 1,
+      drawn: null,
+      drawnFrom: null,
+      closer: null,
+      finalFor: null
+    };
+  }
+
+  function reshuffleIfNeeded() {
+    if (S.deck.length) return;
+    var top = S.discard.pop();
+    var rest = S.discard;
+    S.discard = top ? [top] : [];
+    for (var i = rest.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = rest[i]; rest[i] = rest[j]; rest[j] = t;
+    }
+    S.deck = rest;
+  }
+
+  function visibleGrid(p) {
+    return S.grid[p].map(function (card, i) { return S.up[p][i] ? card : null; });
+  }
+
+  function viewFor(p) {
+    var other = p === 1 ? 2 : 1;
+    var v = {
+      phase: S.phase,
+      yourTurn: S.turn === p,
+      mine: visibleGrid(p),
+      theirs: visibleGrid(other),
+      myUp: S.up[p].slice(),
+      theirUp: S.up[other].slice(),
+      discardTop: S.discard.length ? S.discard[S.discard.length - 1] : null,
+      stockCount: S.deck.length,
+      drawn: (S.turn === p && S.drawn) ? S.drawn : null,
+      drawnFrom: S.turn === p ? S.drawnFrom : null,
+      flipsLeft: S.phase === "setup" ? Math.max(0, 2 - countUp(S.up[p])) : 0,
+      closer: S.closer === null ? null : (S.closer === p ? "you" : "them")
+    };
+    if (S.phase === "over") {
+      v.mine = S.grid[p].slice();
+      v.theirs = S.grid[other].slice();
+      v.myScore = scoreHand(S.grid[p]);
+      v.theirScore = scoreHand(S.grid[other]);
+    }
+    return v;
+  }
+
+  // Applies an intent from player p. Returns true if the state changed.
+  function apply(p, m) {
+    if (!S || S.phase === "over") return false;
+
+    if (S.phase === "setup") {
+      if (m.t !== "flip") return false;
+      if (countUp(S.up[p]) >= 2) return false;
+      if (!(m.slot >= 0 && m.slot < SLOTS) || S.up[p][m.slot]) return false;
+      S.up[p][m.slot] = 1;
+      if (countUp(S.up[1]) >= 2 && countUp(S.up[2]) >= 2) { S.phase = "draw"; S.turn = 1; }
+      return true;
+    }
+
+    if (S.turn !== p) return false;
+
+    if (S.phase === "draw") {
+      if (m.t !== "draw") return false;
+      if (m.from === "discard") {
+        if (!S.discard.length) return false;
+        S.drawn = S.discard.pop();
+        S.drawnFrom = "discard";
+        S.phase = "mustPlace";
+        return true;
+      }
+      reshuffleIfNeeded();
+      if (!S.deck.length) return false;
+      S.drawn = S.deck.pop();
+      S.drawnFrom = "stock";
+      S.phase = "decide";
+      return true;
+    }
+
+    if (S.phase === "decide" || S.phase === "mustPlace") {
+      if (m.t === "place") {
+        if (!(m.slot >= 0 && m.slot < SLOTS)) return false;
+        var old = S.grid[p][m.slot];
+        S.grid[p][m.slot] = S.drawn;
+        S.up[p][m.slot] = 1;
+        S.discard.push(old);
+        S.drawn = null; S.drawnFrom = null;
+        return endTurn(p);
+      }
+      if (m.t === "toss" && S.phase === "decide") {
+        S.discard.push(S.drawn);
+        S.drawn = null; S.drawnFrom = null;
+        S.phase = "flipAfter";
+        return true;
+      }
+      return false;
+    }
+
+    if (S.phase === "flipAfter") {
+      if (m.t !== "flip") return false;
+      if (!(m.slot >= 0 && m.slot < SLOTS) || S.up[p][m.slot]) return false;
+      S.up[p][m.slot] = 1;
+      return endTurn(p);
+    }
+
+    return false;
+  }
+
+  function endTurn(p) {
+    var other = p === 1 ? 2 : 1;
+    if (S.finalFor === p) { S.phase = "over"; return true; }
+    if (S.closer === null && allUp(S.up[p])) { S.closer = p; S.finalFor = other; }
+    if (allUp(S.up[1]) && allUp(S.up[2])) { S.phase = "over"; return true; }
+    S.turn = other;
+    S.phase = "draw";
+    return true;
+  }
+
+  /* ================= rendering ================= */
+
+  var net = null, iAmHost = false, me = 1, view = null;
+
+  function cardEl(card, extra) {
+    var el = document.createElement("div");
+    el.className = "slot faceup" + (extra || "");
+    if (card.s === "♥" || card.s === "♦") el.classList.add("red");
+    var r = document.createElement("span");
+    r.className = "rank"; r.textContent = card.r;
+    var s = document.createElement("span");
+    s.className = "suit"; s.textContent = card.s;
+    el.appendChild(r); el.appendChild(s);
+    return el;
+  }
+
+  function renderHand(container, cards, up, interactive, pickable) {
+    container.textContent = "";
+    var paired = pairedColumns(cards);
+    for (var i = 0; i < SLOTS; i++) {
+      var card = cards[i];
+      var el;
+      if (card) {
+        el = cardEl(card, paired[i] ? " paired" : "");
+        if (paired[i]) {
+          var z = document.createElement("span");
+          z.className = "zero"; z.textContent = "0";
+          el.appendChild(z);
+        }
+      } else {
+        el = document.createElement("div");
+        el.className = "slot facedown";
+      }
+      if (interactive && pickable(i, !!card)) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = el.className + " pickable";
+        btn.innerHTML = el.innerHTML;
+        btn.dataset.slot = i;
+        btn.addEventListener("click", onSlotClick);
+        el = btn;
+      }
+      container.appendChild(el);
+    }
+  }
+
+  function onSlotClick(e) {
+    var slot = Number(e.currentTarget.dataset.slot);
+    if (!view) return;
+    if (view.phase === "setup") send({ t: "flip", slot: slot });
+    else if (view.phase === "decide" || view.phase === "mustPlace") send({ t: "place", slot: slot });
+    else if (view.phase === "flipAfter") send({ t: "flip", slot: slot });
+  }
+
+  function render() {
+    var v = view;
+    if (!v) return;
+
+    var myTurnish = v.phase === "setup" ? v.flipsLeft > 0 : v.yourTurn;
+
+    renderHand($("myHand"), v.mine, v.myUp, myTurnish && v.phase !== "over", function (i, faceUp) {
+      if (v.phase === "setup") return !faceUp && v.flipsLeft > 0;
+      if (v.phase === "decide" || v.phase === "mustPlace") return true;
+      if (v.phase === "flipAfter") return !faceUp;
+      return false;
+    });
+    renderHand($("theirHand"), v.theirs, v.theirUp, false, function () { return false; });
+
+    // piles
+    $("stockCount").textContent = v.stockCount + " left";
+    var canDraw = v.yourTurn && v.phase === "draw";
+    var stock = $("stockPile");
+    stock.className = "slot facedown" + (canDraw && v.stockCount ? " pickable" : "");
+    stock.disabled = !(canDraw && v.stockCount);
+
+    var disc = $("discardPile");
+    disc.textContent = "";
+    disc.className = "slot" + (v.discardTop ? " faceup" : " gone") + (canDraw && v.discardTop ? " pickable" : "");
+    disc.disabled = !(canDraw && v.discardTop);
+    if (v.discardTop) {
+      if (v.discardTop.s === "♥" || v.discardTop.s === "♦") disc.classList.add("red");
+      var dr = document.createElement("span"); dr.className = "rank"; dr.textContent = v.discardTop.r;
+      var ds = document.createElement("span"); ds.className = "suit"; ds.textContent = v.discardTop.s;
+      disc.appendChild(dr); disc.appendChild(ds);
+    }
+
+    var dw = $("drawnWrap");
+    if (v.drawn) {
+      dw.hidden = false;
+      var dc = $("drawnCard");
+      dc.textContent = "";
+      dc.className = "slot faceup";
+      if (v.drawn.s === "♥" || v.drawn.s === "♦") dc.classList.add("red");
+      var xr = document.createElement("span"); xr.className = "rank"; xr.textContent = v.drawn.r;
+      var xs = document.createElement("span"); xs.className = "suit"; xs.textContent = v.drawn.s;
+      dc.appendChild(xr); dc.appendChild(xs);
+    } else dw.hidden = true;
+
+    // status + prompt
+    var t = $("turnText"), sub = $("turnSub"), pr = $("prompt"), pt = $("promptText"), pb = $("promptBtn");
+    pr.hidden = true; pb.hidden = true;
+
+    if (v.phase === "over") {
+      t.textContent = "Hand over";
+      sub.textContent = "";
+      showResult(v);
+    } else if (v.phase === "setup") {
+      t.textContent = v.flipsLeft > 0 ? "Flip two cards" : "Waiting for them";
+      sub.textContent = v.flipsLeft > 0 ? (v.flipsLeft === 2 ? "any two" : "one more") : "they're still choosing";
+    } else if (!v.yourTurn) {
+      t.textContent = "Their turn";
+      sub.textContent = "waiting…";
+    } else {
+      t.textContent = "Your turn";
+      if (v.phase === "draw") { sub.textContent = "take the stock or the discard"; }
+      else if (v.phase === "mustPlace") {
+        sub.textContent = "";
+        pr.hidden = false;
+        pt.textContent = "You took the " + v.drawn.r + v.drawn.s + " from the discard. Put it somewhere in your grid.";
+      } else if (v.phase === "decide") {
+        sub.textContent = "";
+        pr.hidden = false;
+        pt.textContent = "Swap the " + v.drawn.r + v.drawn.s + " into your grid, or throw it away.";
+        pb.hidden = false;
+        pb.textContent = "Throw it away";
+        pb.onclick = function () { send({ t: "toss" }); };
+      } else if (v.phase === "flipAfter") {
+        sub.textContent = "";
+        pr.hidden = false;
+        pt.textContent = "Now flip one of your face-down cards.";
+      }
+    }
+
+    if (v.closer && v.phase !== "over") {
+      sub.textContent = (v.closer === "you" ? "you're out — they get one last turn" : "they're out — this is your last turn");
+    }
+    $("turnDot").hidden = v.phase === "over";
+  }
+
+  function showResult(v) {
+    var mine = v.myScore, theirs = v.theirScore;
+    $("myScore").textContent = mine;
+    $("theirScore").textContent = theirs;
+    $("resultBig").textContent = mine < theirs ? "You win" : mine > theirs ? "They win" : "Tied";
+    $("resultSub").textContent = mine === theirs
+      ? "Level on " + mine + "."
+      : "Lowest score takes it.";
+    var tbl = $("resultTable");
+    tbl.textContent = "";
+    [["You", mine], ["Them", theirs]].forEach(function (row) {
+      var tr = document.createElement("tr");
+      var a = document.createElement("td"); a.textContent = row[0];
+      var b = document.createElement("td"); b.textContent = row[1];
+      tr.appendChild(a); tr.appendChild(b); tbl.appendChild(tr);
+    });
+    $("result").hidden = false;
+    $("againBtn").disabled = false;
+    $("againBtn").textContent = "Play again";
+  }
+
+  /* ================= transport ================= */
+
+  function send(intent) {
+    if (iAmHost) {
+      if (apply(1, intent)) broadcast();
+    } else {
+      net.send({ type: "act", intent: intent });
+    }
+  }
+
+  function broadcast() {
+    view = viewFor(1);
+    render();
+    net.send({ type: "view", view: viewFor(2) });
+  }
+
+  $("stockPile").addEventListener("click", function () { send({ t: "draw", from: "stock" }); });
+  $("discardPile").addEventListener("click", function () { send({ t: "draw", from: "discard" }); });
+
+  $("againBtn").addEventListener("click", function () {
+    $("againBtn").disabled = true;
+    $("againBtn").textContent = "Dealing…";
+    if (iAmHost) { newHand(); $("result").hidden = true; broadcast(); }
+    else net.send({ type: "again" });
+  });
+
+  var lobbyCtl = GameNet.lobby({
+    panel: $("lobby"),
+    hostBtn: $("hostBtn"),
+    joinBtn: $("joinBtn"),
+    codeInput: $("codeInput"),
+    codePlate: $("codePlate"),
+    codeText: $("codeText"),
+    error: $("lobbyError")
+  }, function (connection, role) {
+    net = connection;
+    iAmHost = role === "host";
+    me = iAmHost ? 1 : 2;
+    var code = iAmHost ? $("codeText").textContent.trim() : $("codeInput").value.trim().toUpperCase();
+    if (code) { $("roomCode").textContent = code; $("roomChip").hidden = false; }
+    $("game").hidden = false;
+    if (iAmHost) { newHand(); broadcast(); }
+  });
+
+  lobbyCtl.setHandlers({
+    onData: function (msg) {
+      if (!msg || typeof msg.type !== "string") return;
+      if (msg.type === "view" && !iAmHost) {
+        view = msg.view;
+        if (view.phase !== "over") $("result").hidden = true;
+        render();
+      } else if (msg.type === "act" && iAmHost) {
+        if (apply(2, msg.intent || {})) broadcast();
+      } else if (msg.type === "again" && iAmHost) {
+        newHand(); $("result").hidden = true; broadcast();
+      }
+    },
+    onDrop: function () {
+      $("dropNote").hidden = false;
+      $("turnText").textContent = "Disconnected";
+      $("turnSub").textContent = "";
+    }
+  });
+})();
+</script>
+</body>
+</html>
