@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hues</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+  :root { --accent: var(--c-pink); }
+
+  .scoreline {
+    display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap;
+    margin-left: auto; font-size: 13px; color: var(--mute);
+    font-variation-settings: 'wdth' 90, 'wght' 600;
+  }
+  .scoreline b {
+    color: var(--ink); font-variant-numeric: tabular-nums;
+    font-variation-settings: 'wght' 800; font-size: 15px;
+  }
+
+  /* ---- the board ---- */
+  .boardwrap {
+    margin-top: 6px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--rule); background: var(--surface);
+    box-shadow: 0 14px 34px var(--shadow);
+  }
+  .colgrid {
+    display: grid; grid-template-columns: repeat(30, 1fr);
+    width: 100%; line-height: 0;
+  }
+  .sw {
+    aspect-ratio: 1; border: 0; padding: 0; margin: 0;
+    position: relative; cursor: default; display: block; width: 100%;
+  }
+  .colgrid.live .sw { cursor: crosshair; }
+  .colgrid.live .sw:hover { box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 3px #000; z-index: 3; }
+  .sw:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 3px #000; z-index: 4; }
+
+  .sw .pin {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 8px; font-variation-settings: 'wdth' 85, 'wght' 800;
+    line-height: 1; color: #fff; text-shadow: 0 0 3px rgba(0,0,0,.95);
+    z-index: 2;
+  }
+  .sw.sel  { box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #111; z-index: 5; }
+  .sw.mark { box-shadow: inset 0 0 0 2px #111, inset 0 0 0 4px #fff; z-index: 4; }
+  .sw.target {
+    box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #000, 0 0 0 2px #fff;
+    z-index: 6;
+  }
+  .sw.ring1 { box-shadow: inset 0 0 0 1px rgba(255,255,255,.85); z-index: 1; }
+
+  /* ---- selection readout ---- */
+  .readout {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    margin-top: 12px; padding: 12px 14px; border-radius: 7px;
+    background: var(--surface-2);
+  }
+  .chipcol {
+    width: 46px; height: 46px; border-radius: 6px; flex: none;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
+  }
+  .readout .coord {
+    font-size: 19px; font-variation-settings: 'wdth' 105, 'wght' 800;
+    letter-spacing: .04em; font-variant-numeric: tabular-nums;
+  }
+  .readout .hint { font-size: 12.5px; color: var(--mute); line-height: 1.4; }
+  .readout .btn { margin-left: auto; }
+  .nudge { display: flex; gap: 4px; }
+  .nudge button {
+    width: 32px; height: 32px; padding: 0; border-radius: 5px;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--rule);
+    font-size: 14px; line-height: 1;
+  }
+  .nudge button:hover { background: var(--page); }
+
+  /* ---- the giver's colour ---- */
+  .target-panel {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    padding: 14px 16px; border-radius: 8px; margin: 18px 0 0;
+    background: var(--surface);
+    border-left: 4px solid var(--accent);
+  }
+  .target-panel .swatch {
+    width: 68px; height: 68px; border-radius: 7px; flex: none;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+  }
+  .target-panel .label { font-size: 11.5px; letter-spacing: .1em; color: var(--mute); font-variation-settings: 'wdth' 88, 'wght' 700; }
+  .target-panel .co { font-size: 17px; font-variation-settings: 'wdth' 100, 'wght' 700; letter-spacing: .04em; }
+  .target-panel .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ---- clues ---- */
+  .clues { display: grid; gap: 7px; margin: 16px 0 0; }
+  .clue {
+    display: flex; gap: 11px; align-items: baseline;
+    padding: 11px 14px; border-radius: 7px; background: var(--surface-2);
+  }
+  .clue .n {
+    flex: none; width: 1.6em; font-size: 11.5px; color: var(--mute);
+    font-variation-settings: 'wdth' 85, 'wght' 800; letter-spacing: .06em;
+  }
+  .clue .txt { font-size: 16.5px; font-variation-settings: 'wdth' 100, 'wght' 600; overflow-wrap: anywhere; }
+  .clue.pending .txt { color: var(--mute); font-variation-settings: 'wght' 400; }
+
+  .cluebar { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .cluebar input { flex: 1 1 240px; font-size: 16px; }
+
+  /* ---- reveal ---- */
+  .reveal {
+    margin: 18px 0 0; padding: 16px 18px; border-radius: 8px;
+    background: var(--accent); color: var(--on-colour);
+  }
+  .reveal .big { font-size: 23px; font-variation-settings: 'wdth' 112, 'wght' 800; letter-spacing: -.01em; }
+  .reveal .sub { font-size: 14.5px; margin-top: 5px; opacity: .88; }
+  .reveal table { border-collapse: collapse; margin-top: 11px; font-size: 14px; }
+  .reveal td { padding: 3px 14px 3px 0; font-variant-numeric: tabular-nums; }
+  .reveal .sq { width: 15px; height: 15px; border-radius: 3px; display: inline-block; vertical-align: -2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
+  .reveal .btn { margin-top: 13px; background: var(--on-colour); color: var(--accent); border-color: var(--on-colour); }
+  .reveal .btn:hover { filter: brightness(1.3); }
+
+  .waiting { margin-top: 18px; font-size: 15px; color: var(--mute); }
+
+  table.pts { border-collapse: collapse; font-size: 14px; }
+  table.pts td { padding: 2px 14px 2px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <h1>Hues</h1>
+    <span class="chip" id="roomChip" hidden>Room <b id="roomCode"></b></span>
+    <div class="scoreline" id="scoreline" hidden>
+      <span>You <b id="scMe">0</b></span>
+      <span>Them <b id="scThem">0</b></span>
+      <span id="roundNo"></span>
+    </div>
+  </div>
+  <a class="home" href="index.html">&larr; All games</a>
+
+  <!-- ================= LOBBY ================= -->
+  <section class="lobby" id="lobby">
+    <div>
+      <h2>Colour clues</h2>
+      <p>One of you gets a colour off the board and describes it. The other hunts for it.
+         Up to three clues, and stopping early is worth points.</p>
+    </div>
+    <div class="lobby-row">
+      <button class="btn primary" id="hostBtn" type="button">Start a room</button>
+      <span class="note">or join theirs</span>
+      <input class="code" id="codeInput" maxlength="4" placeholder="CODE" aria-label="Room code" autocomplete="off" spellcheck="false">
+      <button class="btn" id="joinBtn" type="button">Join</button>
+    </div>
+    <div class="code-plate" id="codePlate" hidden>
+      <div>
+        <div class="label">YOUR ROOM CODE</div>
+        <div class="code" id="codeText">&nbsp;</div>
+      </div>
+      <span class="note">Send this over, then wait here.</span>
+    </div>
+    <p class="note bad" id="lobbyError" hidden></p>
+  </section>
+
+  <!-- ================= GAME ================= -->
+  <section id="game" hidden>
+
+    <div class="turn">
+      <span class="dot" id="turnDot" style="background: var(--accent)"></span>
+      <span id="turnText">Setting up</span>
+      <span class="sub" id="turnSub"></span>
+    </div>
+
+    <!-- giver only: the colour to describe -->
+    <div class="target-panel" id="targetPanel" hidden>
+      <div class="swatch" id="targetSwatch"></div>
+      <div>
+        <div class="label">YOUR COLOUR</div>
+        <div class="co" id="targetCoord">&mdash;</div>
+      </div>
+      <div class="acts">
+        <button class="btn" id="shuffleBtn" type="button">Different one</button>
+        <button class="btn primary" id="startBtn" type="button">Start giving clues</button>
+      </div>
+    </div>
+
+    <div class="boardwrap">
+      <div class="colgrid" id="board"></div>
+    </div>
+
+    <!-- guesser only: what's selected -->
+    <div class="readout" id="readout" hidden>
+      <div class="chipcol" id="selSwatch"></div>
+      <div>
+        <div class="coord" id="selCoord">&mdash;</div>
+        <div class="hint" id="selHint">Tap the board, nudge with the arrows, then place it.</div>
+      </div>
+      <div class="nudge">
+        <button type="button" id="nLeft" aria-label="Left">&larr;</button>
+        <button type="button" id="nUp" aria-label="Up">&uarr;</button>
+        <button type="button" id="nDown" aria-label="Down">&darr;</button>
+        <button type="button" id="nRight" aria-label="Right">&rarr;</button>
+      </div>
+      <button class="btn primary" id="placeBtn" type="button" disabled>Place guess</button>
+    </div>
+
+    <div class="clues" id="clues"></div>
+
+    <div class="cluebar" id="cluebar" hidden>
+      <input id="clueInput" maxlength="60" placeholder="Describe the colour&#8230;" autocomplete="off">
+      <button class="btn primary" id="clueBtn" type="button">Send clue</button>
+    </div>
+
+    <div class="cluebar" id="lockbar" hidden>
+      <button class="btn" id="nextClueBtn" type="button">Ask for another clue</button>
+      <button class="btn primary" id="lockBtn" type="button">Lock in my best guess</button>
+    </div>
+
+    <p class="waiting" id="waiting" hidden></p>
+
+    <div class="reveal" id="reveal" hidden>
+      <div class="big" id="revealBig"></div>
+      <div class="sub" id="revealSub"></div>
+      <table id="revealTable"></table>
+      <button class="btn" id="againBtn" type="button">Next round</button>
+    </div>
+
+    <p class="note bad" id="dropNote" hidden>The connection dropped. Reload and start a new room.</p>
+  </section>
+
+  <details class="help">
+    <summary>How it works and how it scores</summary>
+    <p>480 colours, laid out in rows A to P and columns 1 to 30. One of you gets a colour at random
+       and describes it in your own words; the other hunts for it on the board. You swap roles each
+       round.</p>
+    <ul>
+      <li>After each clue the guesser places a guess. Up to three clues, three guesses.</li>
+      <li>The guesser can lock in after any guess. Their best guess is the one that counts, so an
+          early wrong guess costs nothing.</li>
+      <li>Exact square 5 points, one square away 3, two away 2, three or four away 1.</li>
+      <li>Plus one point for every clue not used &mdash; nailing it off one clue is worth 7.</li>
+      <li>Only the giver sees the colour, and the guesser isn't told how close they got until the
+          reveal. Clues can be anything: a word, a thing, a memory.</li>
+      <li>Red appears at both ends of the board, since the hues wrap around. That's on purpose.</li>
+    </ul>
+  </details>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="net.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var COLS = 30, ROWS = 16, MAX_CLUES = 3;
+  var LETTERS = "ABCDEFGHIJKLMNOP";
+
+  /* ---------------- colour model ---------------- */
+
+  function css(r, c) {
+    var h = c * (360 / COLS);
+    var t = r / (ROWS - 1);
+    var l = 86 - t * 66;
+    var s = 62 + Math.sin(Math.PI * t) * 33;
+    return "hsl(" + h.toFixed(1) + " " + s.toFixed(1) + "% " + l.toFixed(1) + "%)";
+  }
+  function coord(r, c) { return LETTERS[r] + (c + 1); }
+  function cheb(a, b) { return Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c)); }
+  function pointsFor(d) {
+    if (d === 0) return 5;
+    if (d === 1) return 3;
+    if (d === 2) return 2;
+    if (d <= 4) return 1;
+    return 0;
+  }
+  function randomCell() {
+    return { r: Math.floor(Math.random() * ROWS), c: Math.floor(Math.random() * COLS) };
+  }
+
+  /* ---------------- state ---------------- */
+
+  var net = null, iAmHost = false;
+  var role = "giver";          // giver | guesser
+  var phase = "idle";          // idle | picking | clue | guessing | waitClue | waitGuess | reveal
+  var roundNo = 0;
+  var target = null;           // giver only
+  var clues = [];
+  var guesses = [];            // [{r,c}] — both sides track these
+  var sel = null;              // guesser's cursor
+  var locked = false;          // guesser has committed; ignore any clue still in flight
+  var totals = { me: 0, them: 0 };
+  var cells = [];              // cells[r][c] -> button
+
+  /* ---------------- board ---------------- */
+
+  function buildBoard() {
+    var g = $("board");
+    g.textContent = "";
+    cells = [];
+    for (var r = 0; r < ROWS; r++) {
+      cells.push([]);
+      for (var c = 0; c < COLS; c++) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "sw";
+        b.style.background = css(r, c);
+        b.dataset.r = r; b.dataset.c = c;
+        b.setAttribute("aria-label", coord(r, c));
+        b.addEventListener("click", onCellClick);
+        cells[r].push(b);
+        g.appendChild(b);
+      }
+    }
+  }
+
+  function onCellClick(e) {
+    var r = Number(e.currentTarget.dataset.r), c = Number(e.currentTarget.dataset.c);
+    if (phase === "picking" && role === "giver") { target = { r: r, c: c }; paintTargetPanel(); paintBoard(); return; }
+    if (phase === "guessing" && role === "guesser") { sel = { r: r, c: c }; paintReadout(); paintBoard(); }
+  }
+
+  function paintBoard() {
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        cells[r][c].className = "sw";
+        cells[r][c].textContent = "";
+      }
+    }
+    // placed guesses, numbered
+    guesses.forEach(function (g, i) {
+      var el = cells[g.r][g.c];
+      el.classList.add("mark");
+      var p = document.createElement("span");
+      p.className = "pin";
+      p.textContent = i + 1;
+      el.appendChild(p);
+    });
+    if (phase === "picking" && role === "giver" && target) cells[target.r][target.c].classList.add("sel");
+    if (phase === "guessing" && sel) cells[sel.r][sel.c].classList.add("sel");
+    if (phase === "reveal" && target) {
+      cells[target.r][target.c].classList.add("target");
+      for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) {
+        var rr = target.r + dr, cc = target.c + dc;
+        if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && !(dr === 0 && dc === 0)) cells[rr][cc].classList.add("ring1");
+      }
+    }
+    $("board").classList.toggle("live",
+      (phase === "picking" && role === "giver") || (phase === "guessing" && role === "guesser"));
+  }
+
+  /* ---------------- panels ---------------- */
+
+  function paintTargetPanel() {
+    if (!target) return;
+    $("targetSwatch").style.background = css(target.r, target.c);
+    $("targetCoord").textContent = coord(target.r, target.c);
+  }
+
+  function paintReadout() {
+    var ok = !!sel;
+    $("selSwatch").style.background = ok ? css(sel.r, sel.c) : "transparent";
+    $("selCoord").textContent = ok ? coord(sel.r, sel.c) : "—";
+    $("placeBtn").disabled = !ok;
+  }
+
+  function paintClues() {
+    var box = $("clues");
+    box.textContent = "";
+    clues.forEach(function (text, i) {
+      var d = document.createElement("div");
+      d.className = "clue";
+      var n = document.createElement("span");
+      n.className = "n"; n.textContent = "C" + (i + 1);
+      var t = document.createElement("span");
+      t.className = "txt"; t.textContent = text;
+      d.appendChild(n); d.appendChild(t);
+      box.appendChild(d);
+    });
+    if (phase === "waitClue" && clues.length < MAX_CLUES) {
+      var p = document.createElement("div");
+      p.className = "clue pending";
+      var pn = document.createElement("span");
+      pn.className = "n"; pn.textContent = "C" + (clues.length + 1);
+      var pt = document.createElement("span");
+      pt.className = "txt"; pt.textContent = "waiting for their clue…";
+      p.appendChild(pn); p.appendChild(pt);
+      box.appendChild(p);
+    }
+  }
+
+  function paintScores() {
+    $("scoreline").hidden = false;
+    $("scMe").textContent = totals.me;
+    $("scThem").textContent = totals.them;
+    $("roundNo").textContent = "Round " + roundNo;
+  }
+
+  /* ---------------- phase rendering ---------------- */
+
+  function setPhase(p) {
+    phase = p;
+    var giver = role === "giver";
+
+    $("targetPanel").hidden = !(giver && (p === "picking" || p === "clue" || p === "waitGuess"));
+    $("shuffleBtn").hidden = p !== "picking";
+    $("startBtn").hidden = p !== "picking";
+    $("readout").hidden = !(!giver && p === "guessing");
+    $("cluebar").hidden = !(giver && p === "clue");
+    $("lockbar").hidden = !(!giver && p === "waitClue" && guesses.length > 0 && guesses.length < MAX_CLUES);
+    $("reveal").hidden = p !== "reveal";
+    $("waiting").hidden = true;
+    $("turnDot").hidden = p === "reveal";
+
+    var t = $("turnText"), s = $("turnSub");
+
+    if (p === "picking") {
+      t.textContent = "Your colour";
+      s.textContent = "keep it or pick another off the board";
+    } else if (p === "clue") {
+      t.textContent = "Clue " + (clues.length + 1) + " of " + MAX_CLUES;
+      s.textContent = guesses.length ? "they've guessed " + guesses.length + " time" + (guesses.length > 1 ? "s" : "") : "describe it however you like";
+    } else if (p === "waitGuess") {
+      t.textContent = "Waiting for their guess";
+      s.textContent = "";
+      $("waiting").hidden = false;
+      $("waiting").textContent = "They're hunting for it.";
+    } else if (p === "guessing") {
+      t.textContent = "Guess " + (guesses.length + 1);
+      s.textContent = "pick the square you think they mean";
+    } else if (p === "waitClue") {
+      t.textContent = guesses.length ? "Guess placed" : "Waiting for a clue";
+      s.textContent = guesses.length >= MAX_CLUES ? "that was your last guess" : "";
+      if (!guesses.length) { $("waiting").hidden = false; $("waiting").textContent = "They're thinking of how to describe it."; }
+    } else if (p === "reveal") {
+      t.textContent = "Round " + roundNo + " done";
+      s.textContent = "";
+    }
+
+    paintClues();
+    paintBoard();
+  }
+
+  /* ---------------- round flow ---------------- */
+
+  function beginRound(n, iGive) {
+    roundNo = n;
+    role = iGive ? "giver" : "guesser";
+    clues = [];
+    guesses = [];
+    sel = null;
+    locked = false;
+    target = iGive ? randomCell() : null;
+    $("reveal").hidden = true;
+    $("clueInput").value = "";
+    $("againBtn").disabled = false;
+    $("againBtn").textContent = "Next round";
+    paintScores();
+    paintReadout();
+    if (iGive) { paintTargetPanel(); setPhase("picking"); }
+    else setPhase("waitClue");
+  }
+
+  $("shuffleBtn").addEventListener("click", function () {
+    if (phase !== "picking") return;
+    target = randomCell();
+    paintTargetPanel();
+    paintBoard();
+  });
+
+  $("startBtn").addEventListener("click", function () {
+    if (phase !== "picking" || !target) return;
+    setPhase("clue");
+    $("clueInput").focus();
+  });
+
+  $("clueBtn").addEventListener("click", function () {
+    if (phase !== "clue") return;
+    var text = $("clueInput").value.trim().replace(/\s+/g, " ");
+    if (!text) { $("turnSub").textContent = "Type something first."; return; }
+    $("clueInput").value = "";
+    clues.push(text);
+    net.send({ type: "clue", text: text, n: clues.length, round: roundNo });
+    setPhase("waitGuess");
+  });
+  $("clueInput").addEventListener("keydown", function (e) { if (e.key === "Enter") $("clueBtn").click(); });
+
+  function nudge(dr, dc) {
+    if (phase !== "guessing") return;
+    if (!sel) sel = { r: Math.floor(ROWS / 2), c: Math.floor(COLS / 2) };
+    else sel = { r: Math.min(ROWS - 1, Math.max(0, sel.r + dr)), c: Math.min(COLS - 1, Math.max(0, sel.c + dc)) };
+    paintReadout(); paintBoard();
+  }
+  $("nLeft").addEventListener("click", function () { nudge(0, -1); });
+  $("nRight").addEventListener("click", function () { nudge(0, 1); });
+  $("nUp").addEventListener("click", function () { nudge(-1, 0); });
+  $("nDown").addEventListener("click", function () { nudge(1, 0); });
+
+  document.addEventListener("keydown", function (e) {
+    if ($("game").hidden || phase !== "guessing") return;
+    var map = { ArrowLeft: [0,-1], ArrowRight: [0,1], ArrowUp: [-1,0], ArrowDown: [1,0] };
+    if (map[e.key]) { nudge(map[e.key][0], map[e.key][1]); e.preventDefault(); }
+    else if (e.key === "Enter" && sel) { $("placeBtn").click(); e.preventDefault(); }
+  });
+
+  $("placeBtn").addEventListener("click", function () {
+    if (phase !== "guessing" || !sel) return;
+    guesses.push({ r: sel.r, c: sel.c });
+    net.send({ type: "guess", r: sel.r, c: sel.c, round: roundNo });
+    sel = null;
+    paintReadout();
+    if (guesses.length >= MAX_CLUES) { locked = true; net.send({ type: "lock", round: roundNo }); }
+    setPhase("waitClue");
+  });
+
+  $("nextClueBtn").addEventListener("click", function () {
+    if (phase !== "waitClue") return;
+    net.send({ type: "wantClue", round: roundNo });
+    $("lockbar").hidden = true;
+    $("waiting").hidden = false;
+    $("waiting").textContent = "Asked for another clue.";
+  });
+
+  $("lockBtn").addEventListener("click", function () {
+    if (phase !== "waitClue" || locked) return;
+    locked = true;
+    net.send({ type: "lock", round: roundNo });
+    $("lockbar").hidden = true;
+    $("waiting").hidden = false;
+    $("waiting").textContent = "Locked in. Waiting for the reveal…";
+  });
+
+  /* ---------------- scoring and reveal (giver computes) ---------------- */
+
+  function finishRound() {
+    var scored = guesses.map(function (g) {
+      var d = cheb(g, target);
+      return { r: g.r, c: g.c, d: d, p: pointsFor(d) };
+    });
+    var best = scored.reduce(function (m, s) { return s.p > m ? s.p : m; }, 0);
+    var bonus = MAX_CLUES - clues.length;
+    var total = best + bonus;
+    totals.them += total;
+    var payload = {
+      type: "reveal", round: roundNo,
+      target: target, scored: scored, best: best, bonus: bonus, total: total
+    };
+    net.send(payload);
+    showReveal(payload, false);
+  }
+
+  function showReveal(d, iGuessed) {
+    target = d.target;
+    guesses = d.scored.map(function (s) { return { r: s.r, c: s.c }; });
+    if (iGuessed) totals.me += d.total;
+    paintScores();
+    setPhase("reveal");
+
+    var who = iGuessed ? "You" : "They";
+    $("revealBig").textContent = d.best === 5
+      ? (iGuessed ? "You nailed it" : "They nailed it")
+      : who + " scored " + d.total;
+    var bits = [];
+    bits.push("The colour was " + coord(d.target.r, d.target.c) + ".");
+    if (d.bonus) bits.push(d.bonus + " point" + (d.bonus > 1 ? "s" : "") + " for stopping early.");
+    $("revealSub").textContent = bits.join(" ");
+
+    var tbl = $("revealTable");
+    tbl.textContent = "";
+    d.scored.forEach(function (s, i) {
+      var tr = document.createElement("tr");
+      var a = document.createElement("td");
+      var sq = document.createElement("span");
+      sq.className = "sq"; sq.style.background = css(s.r, s.c);
+      a.appendChild(sq);
+      a.appendChild(document.createTextNode(" Guess " + (i + 1) + " · " + coord(s.r, s.c)));
+      var b = document.createElement("td");
+      b.textContent = s.d === 0 ? "exact" : s.d + " square" + (s.d > 1 ? "s" : "") + " off";
+      var c2 = document.createElement("td");
+      c2.textContent = s.p + " pt" + (s.p === 1 ? "" : "s");
+      tr.appendChild(a); tr.appendChild(b); tr.appendChild(c2);
+      tbl.appendChild(tr);
+    });
+  }
+
+  $("againBtn").addEventListener("click", function () {
+    $("againBtn").disabled = true;
+    $("againBtn").textContent = "Setting up…";
+    // roles swap: whoever just guessed gives the next one
+    var iGiveNext = role === "guesser";
+    net.send({ type: "next", round: roundNo + 1, youGive: !iGiveNext });
+    beginRound(roundNo + 1, iGiveNext);
+  });
+
+  /* ---------------- transport ---------------- */
+
+  buildBoard();
+
+  var lobbyCtl = GameNet.lobby({
+    panel: $("lobby"),
+    hostBtn: $("hostBtn"),
+    joinBtn: $("joinBtn"),
+    codeInput: $("codeInput"),
+    codePlate: $("codePlate"),
+    codeText: $("codeText"),
+    error: $("lobbyError")
+  }, function (connection, r) {
+    net = connection;
+    iAmHost = r === "host";
+    var code = iAmHost ? $("codeText").textContent.trim() : $("codeInput").value.trim().toUpperCase();
+    if (code) { $("roomCode").textContent = code; $("roomChip").hidden = false; }
+    $("game").hidden = false;
+    if (iAmHost) { net.send({ type: "next", round: 1 }); beginRound(1, true); }
+  });
+
+  lobbyCtl.setHandlers({
+    onData: function (m) {
+      if (!m || typeof m.type !== "string") return;
+
+      if (m.type === "next") {
+        beginRound(m.round, !!m.youGive);
+        return;
+      }
+      if (m.round !== roundNo) return;
+
+      if (m.type === "clue" && role === "guesser") {
+        if (locked) return;                    // already committed; clue was in flight
+        clues.push(String(m.text || "").slice(0, 60));
+        setPhase("guessing");
+
+      } else if (m.type === "guess" && role === "giver") {
+        if (phase === "reveal") return;
+        guesses.push({ r: m.r | 0, c: m.c | 0 });
+        paintBoard();
+        if (guesses.length >= MAX_CLUES) return;   // their lock follows
+        setPhase("clue");
+
+      } else if (m.type === "wantClue" && role === "giver") {
+        if (phase !== "reveal") setPhase("clue");
+
+      } else if (m.type === "lock" && role === "giver") {
+        if (phase !== "reveal") finishRound();
+
+      } else if (m.type === "reveal" && role === "guesser") {
+        showReveal(m, true);
+      }
+    },
+
+    onDrop: function () {
+      $("dropNote").hidden = false;
+      $("turnText").textContent = "Disconnected";
+      $("turnSub").textContent = "";
+      $("board").classList.remove("live");
+    }
+  });
+})();
+</script>
+</body>
+</html>
